@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>鍵のかかった家</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <main class="game">
+    <!-- 上の帯: 左端にメニューボタン(版37)、中央に今いる面の名前 -->
+    <div class="topbar">
+      <!-- メニューボタン。三本線は CSS で描く(絵文字の「☰」は OS によって見た目が変わるため使わない) -->
+      <button id="menu-button" class="menu-button" aria-label="メニュー" aria-expanded="false" aria-controls="menu-list">
+        <span></span><span></span><span></span>
+      </button>
+      <h1 id="wall-name" class="wall-name"></h1>
+      <!-- メニューの中身。押し間違いを防ぐため、画面の下に並べていたボタンをここにまとめた(版37)。
+           開き方・閉じ方は js/main.js の setupMenu -->
+      <div id="menu-list" class="menu-list" hidden>
+        <button id="reset-button">最初から</button>
+        <!-- 動作確認用。アーティファクト版(1ファイル版)だけで表示する(js/debug.js の setupQuickStart) -->
+        <button id="start-room1" hidden>1部屋目から</button>
+        <button id="start-room2" hidden>2部屋目から</button>
+      </div>
+    </div>
+
+    <!-- 部屋の面。中身(物のボタン)は js/render.js が作る -->
+    <div class="room-frame">
+      <button id="go-left" class="arrow arrow-left" aria-label="左を向く">◀</button>
+      <div id="room" class="room"></div>
+      <button id="go-right" class="arrow arrow-right" aria-label="右を向く">▶</button>
+    </div>
+
+    <!-- メッセージ欄。aria-live で読み上げソフトにも変化を伝える -->
+    <p id="message" class="message" aria-live="polite"></p>
+
+    <!-- 持ち物欄 -->
+    <section class="inventory">
+      <h2>持ち物</h2>
+      <div id="items" class="items"></div>
+    </section>
+
+
+    <!-- 開始画面・区切りの画面・クリア画面。どれも画面全体に重ねて表示する(overlay)。
+         開始画面とクリア画面は、上に扉の絵、下にタイトル・文章・ボタンを置く(overlay-scene。版29)。
+         絵は js/render.js が data/svg.js の START_SCENE_SVG / CLEAR_SCENE_SVG から入れる。
+         区切りの画面は絵なし -->
+    <section id="start-screen" class="overlay overlay-scene" hidden>
+      <div id="start-art" class="scene-art"></div>
+      <p id="start-title" class="overlay-title"></p>
+      <p id="start-message" class="overlay-message"></p>
+      <button id="start-button">ゲーム開始</button>
+    </section>
+    <section id="room-screen" class="overlay" hidden>
+      <p id="room-title" class="overlay-title"></p>
+      <p id="room-message" class="overlay-message"></p>
+      <button id="room-button">進む</button>
+    </section>
+    <section id="clear-screen" class="overlay overlay-scene" hidden>
+      <div id="clear-art" class="scene-art"></div>
+      <!-- 友人からの手紙(版33)。文章は data/game.js の clear.letter。
+           版36から、扉の絵の下のほうに重ねて表示する(貼り紙らしく見せるため)ので、絵のすぐ後に書く -->
+      <p id="clear-letter" class="clear-letter"></p>
+      <p id="clear-title" class="overlay-title"></p>
+      <!-- クリアまでの時間とベスト(版35)。文章は js/render.js の clearTimeText() -->
+      <p id="clear-time" class="clear-time"></p>
+      <p id="clear-message" class="overlay-message"></p>
+      <button id="clear-restart">最初から</button>
+    </section>
+
+    <!-- 「最初から」の確認画面。ブラウザ標準の confirm() は埋め込み表示などで使えないことがあるので自作する -->
+    <dialog id="confirm-dialog" class="confirm-dialog">
+      <p>最初からやり直しますか？</p>
+      <div class="confirm-buttons">
+        <button id="confirm-yes">やり直す</button>
+        <button id="confirm-no">やめる</button>
+      </div>
+    </dialog>
+
+    <!-- 数字の錠の入力画面。<dialog> は画面の上に重ねて表示できる HTML の部品 -->
+    <dialog id="lock-dialog" class="lock-dialog">
+      <p id="lock-prompt" class="lock-prompt"></p>
+      <p id="lock-display" class="lock-display"></p>
+      <p id="lock-note" class="lock-note" aria-live="polite"></p>
+      <div class="keypad">
+        <button data-digit="1">1</button>
+        <button data-digit="2">2</button>
+        <button data-digit="3">3</button>
+        <button data-digit="4">4</button>
+        <button data-digit="5">5</button>
+        <button data-digit="6">6</button>
+        <button data-digit="7">7</button>
+        <button data-digit="8">8</button>
+        <button data-digit="9">9</button>
+        <button id="lock-clear">消去</button>
+        <button data-digit="0">0</button>
+        <button id="lock-submit" class="lock-submit">決定</button>
+      </div>
+      <!-- 「閉じる」は「決定」と押し間違えないよう、決定から遠い右上に「×」で置く(位置は CSS で指定)。
+           入力画面を開いたときに最初のボタンへ自動で移る選択(フォーカス)が「×」に当たらないよう、最後に書く -->
+      <button id="lock-close" class="lock-close" aria-label="閉じる">×</button>
+    </dialog>
+
+    <!-- 色の錠の入力画面(版20)。見た目・配置は数字の錠の入力画面にそろえる。
+         色のボタンは js/locks.js が data/game.js の LOCK_COLORS から作る(最初のボタン「赤」に選択(フォーカス)が当たる) -->
+    <dialog id="color-lock-dialog" class="lock-dialog">
+      <p id="color-lock-prompt" class="lock-prompt"></p>
+      <div id="color-lock-display" class="color-display" aria-live="polite"></div>
+      <p id="color-lock-note" class="lock-note" aria-live="polite"></p>
+      <div id="color-pad" class="color-pad"></div>
+      <div class="keypad keypad-2">
+        <button id="color-lock-clear">消去</button>
+        <button id="color-lock-submit" class="lock-submit">決定</button>
+      </div>
+      <!-- 数字の錠と同じく、「×」は最後に書いて、開いたときの選択が当たらないようにする -->
+      <button id="color-lock-close" class="lock-close" aria-label="閉じる">×</button>
+    </dialog>
+
+    <!-- デバッグ用パネル。URLに ?debug=1(アーティファクトでは #debug)を付けたときだけ表示 -->
+    <section id="debug-panel" class="debug-panel" hidden>
+      <h2>デバッグ</h2>
+      <div id="debug-walls"></div>
+      <div class="debug-row">
+        <span>画面:</span>
+        <button id="debug-start-screen">開始画面を表示</button>
+        <button id="debug-clear-screen">クリア画面を表示</button>
+      </div>
+      <button id="debug-clear">保存データを消去して再読み込み</button>
+    </section>
+  </main>
+
+  <!-- 読み込む順番に意味がある。後のファイルが、前のファイルで作った定数や関数を使うため。
+       (type="module" は、index.html をファイルのまま開くと Chrome で読み込めないので使わない)
+       1. data/svg.js    絵
+       2. data/items.js  アイテム(絵を使う)
+       3. data/room1.js  1部屋目(絵を使う)
+       4. data/room2.js  台所(絵を使う)
+       5. data/room3.js  洗面所・浴室とトイレ(絵を使う)
+       6. data/game.js   上の5つをまとめて GAME_DATA を作る
+       7. js/ の処理。state.js が最初、main.js が最後(main.js が起動する) -->
+  <script src="data/svg.js"></script>
+  <script src="data/items.js"></script>
+  <script src="data/room1.js"></script>
+  <script src="data/room2.js"></script>
+  <script src="data/room3.js"></script>
+  <script src="data/game.js"></script>
+  <script src="js/state.js"></script>
+  <script src="js/save.js"></script>
+  <script src="js/locks.js"></script>
+  <script src="js/render.js"></script>
+  <script src="js/debug.js"></script>
+  <script src="js/main.js"></script>
+</body>
+</html>

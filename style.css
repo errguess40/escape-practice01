@@ -1,0 +1,808 @@
+/* 全体 */
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  background: #2f2a26;
+  color: #f3ede6;
+  font-family: system-ui, -apple-system, "Hiragino Sans", "Yu Gothic UI", sans-serif;
+}
+
+.game {
+  max-width: 600px;
+  margin: 0 auto;
+  padding: 12px;
+}
+
+button {
+  font: inherit;
+  cursor: pointer;
+}
+
+/* 上の帯(版37)。左端にメニューボタン、中央に面の名前 */
+.topbar {
+  position: relative; /* メニューのリストを、この帯の下に重ねて出すための基準 */
+  min-height: 44px;
+  margin-bottom: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.wall-name {
+  margin: 0;
+  font-size: 1.1rem;
+  text-align: center;
+}
+
+/* メニューボタン(44px 四方)。中の3本の span を横線として描く。
+   版38: 背景(濃い茶色)と見分けやすいよう、明るい枠と、少し明るい背景にする。
+   金色は「選択中のアイテム」や「決定」の色なので使わない */
+.menu-button {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 44px;
+  height: 44px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  padding: 0;
+  border: 2px solid #d8cfc4;
+  border-radius: 6px;
+  background: #6e6157;
+}
+
+.menu-button span {
+  display: block;
+  width: 22px;
+  height: 3px;
+  border-radius: 1.5px;
+  background: #ffffff;
+}
+
+.menu-button:hover,
+.menu-button:focus-visible,
+.menu-button[aria-expanded="true"] {
+  background: #8a7b6f; /* 指を乗せたとき・開いている間は、さらに明るくする */
+  outline: none;
+}
+
+/* メニューのリスト。帯のすぐ下、左端に重ねて出す(部屋の面や矢印より手前、重ね画面より奥) */
+.menu-list {
+  position: absolute;
+  left: 0;
+  top: 48px;
+  z-index: 5;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 160px;
+  padding: 8px;
+  border: 1px solid #6b5a4b;
+  border-radius: 6px;
+  background: #2f2a26;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
+}
+
+.menu-list button {
+  min-height: 44px;
+  padding: 4px 14px;
+  border: 1px solid #6b5a4b;
+  border-radius: 6px;
+  background: #4a403a;
+  color: inherit;
+  text-align: left;
+}
+
+/* 部屋の面 */
+.room-frame {
+  position: relative;
+}
+
+.room {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 4 / 3;          /* 横4:縦3 の比率を保つ */
+  container-type: inline-size;  /* 中の文字の大きさを部屋の幅に合わせるため */
+  overflow: hidden;
+  border-radius: 6px;
+  background: #e9e0d2;          /* 壁の色(床は下の floor-〜 で部屋ごとに描く) */
+}
+
+/* 床の見た目は部屋ごとに変える(data/room1.js・data/room2.js の floorClass)。上70%が壁、下30%が床 */
+
+/* 1部屋目: フローリング */
+.floor-wood {
+  background:
+    repeating-linear-gradient(90deg, #a8794e 0 12%, #9a6d44 12% 12.4%) bottom / 100% 30% no-repeat,
+    #e9e0d2;
+}
+
+/* 台所: 白っぽいタイル張り。壁も少し明るい色にする。
+   床は ::before で下30%に重ね、タイル1枚ぶん(横12枚・縦3枚)の模様を繰り返して目地の間隔をそろえる。
+   ::before は部屋の物より先に描かれるので、物は床の手前に表示される */
+.floor-tile {
+  background: #f1ece2;
+}
+
+.floor-tile::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 30%;
+  background:
+    linear-gradient(90deg, #9e9a92 1px, transparent 1px) 0 0 / calc(100% / 12) calc(100% / 3), /* 縦の目地 */
+    linear-gradient(#9e9a92 1px, transparent 1px) 0 0 / calc(100% / 12) calc(100% / 3),        /* 横の目地 */
+    #d9d4c8;
+}
+
+/* ユニットバス: 灰色の防水パン(細かい格子の滑り止め)。壁は明るい灰色 */
+.floor-bath {
+  background: #eef1f2;
+}
+
+.floor-bath::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 30%;
+  background:
+    linear-gradient(90deg, #b8bec2 1px, transparent 1px) 0 0 / calc(100% / 24) calc(100% / 6),
+    linear-gradient(#b8bec2 1px, transparent 1px) 0 0 / calc(100% / 24) calc(100% / 6),
+    #cdd3d6;
+}
+
+/* 面を移ったときのフェード(版31)。js/render.js が、面が変わったときだけ付ける */
+@keyframes room-fade {
+  from { opacity: 0.3; }
+  to   { opacity: 1; }
+}
+
+.room-fade {
+  animation: room-fade 0.2s ease-out;
+}
+
+/* トイレの明かりを消したとき(版40)。部屋の面の上に暗い幕を重ねる。
+   幕は物より手前(z-index 2)だが、スイッチと壁の線(.in-dark)はさらに手前(z-index 3)に出す。
+   幕はクリックを通す(pointer-events: none)ので、暗い間に物を押すと js/main.js が「暗くて見えない。」を出す */
+.room-dark::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  background: rgba(8, 10, 20, 0.9);
+  pointer-events: none;
+}
+
+.object.in-dark {
+  z-index: 3;
+}
+
+/* 部屋の物(共通) */
+.object {
+  position: absolute;
+  padding: 0;
+  border: none;
+  background: none;
+  line-height: 1;
+  font-size: calc(var(--size) * 1cqw); /* data の size(部屋の幅に対する%)。絵文字の物だけで使う */
+}
+
+.object:hover,
+.object:focus-visible {
+  filter: drop-shadow(0 0 4px #fff7c2);
+  outline: none;
+}
+
+/* SVG で描いた物は、中の絵を枠いっぱいに表示する */
+.object svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+/* クローゼットの扉に留めた板(CSS で形を作る)。両端にネジの頭を描く */
+.board {
+  background:
+    radial-gradient(circle, #6f757b 0 35%, transparent 40%) 3% 50% / 5% 60% no-repeat,  /* 左のネジ */
+    radial-gradient(circle, #6f757b 0 35%, transparent 40%) 97% 50% / 5% 60% no-repeat, /* 右のネジ */
+    #b88a5c;
+  border: 1px solid #7a5532;
+  transform: rotate(-3deg);
+  box-shadow: 0 3px 4px rgba(0, 0, 0, 0.35);
+}
+
+/* 本棚(棚板2枚の木の箱。上の段と下の段に本を5冊ずつ立てる)。
+   棚板の上端は本棚の高さの 35% と 72% の位置(位置の % は「(100% - 棚板の厚さ4%) × 割合」で決まるため 36.5% と 75% と書く) */
+.bookshelf {
+  background:
+    linear-gradient(#5e3f22, #5e3f22) 0 36.5% / 100% 4% no-repeat, /* 上の段の棚板 */
+    linear-gradient(#5e3f22, #5e3f22) 0 75% / 100% 4% no-repeat,   /* 下の段の棚板 */
+    #7a5532;
+  border: 4px solid #5e3f22;
+  box-shadow: inset 0 0 12px rgba(0, 0, 0, 0.5);
+}
+
+/* 本(布張りのハードカバーを立てて並べた背表紙。5冊とも同じ見た目で、番号だけが違う) */
+.book {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid #1c3626;
+  border-radius: 3px 3px 2px 2px;
+  color: #e8c86a;               /* 数字は金の箔押し風 */
+  font-family: Georgia, "Times New Roman", serif;
+  font-weight: bold;
+  font-size: 3.5cqw;            /* 部屋の幅の3.5% */
+  text-shadow: 0 1px 0 rgba(0, 0, 0, 0.5);
+  background:
+    /* 背表紙の上下にある金の帯(上2本・下2本) */
+    linear-gradient(#c9a447, #c9a447) 0 9% / 100% 2.5% no-repeat,
+    linear-gradient(#c9a447, #c9a447) 0 15% / 100% 2.5% no-repeat,
+    linear-gradient(#c9a447, #c9a447) 0 85% / 100% 2.5% no-repeat,
+    linear-gradient(#c9a447, #c9a447) 0 91% / 100% 2.5% no-repeat,
+    /* 丸みのある背表紙に見せる陰影(両端を暗く、左寄りを明るく) */
+    linear-gradient(90deg, rgba(0, 0, 0, 0.4), rgba(255, 255, 255, 0.15) 35%, rgba(0, 0, 0, 0.1) 65%, rgba(0, 0, 0, 0.45)),
+    #2f5a3e;                    /* 深緑の布張り */
+}
+
+/* 扉(木の板+取っ手) */
+.door {
+  background: #8b5a3c;
+  border: 3px solid #6b4128;
+  border-bottom: none;
+  border-radius: 3px 3px 0 0;
+}
+
+.door::before { /* 扉の飾りの枠 */
+  content: "";
+  position: absolute;
+  inset: 8% 14% 8% 14%;
+  border: 2px solid rgba(0, 0, 0, 0.25);
+}
+
+.door::after { /* 取っ手 */
+  content: "";
+  position: absolute;
+  right: 8%;
+  top: 52%;
+  width: 12%;
+  aspect-ratio: 1;
+  border-radius: 50%;
+  background: #d8c9a8;
+}
+
+/* 台所の玄関の扉。部屋の扉と見分けられるよう、濃い紺色の金属の扉にする(形は .door と同じ) */
+.door-genkan {
+  background: #3b4a5c;
+  border-color: #27323f;
+}
+
+.door-genkan::before { /* 飾りの枠の代わりに、上のほうに細長い覗き窓 */
+  inset: 12% 40% 70% 40%;
+  border: 2px solid #9aa7b4;
+  background: #1c242d;
+}
+
+.door-genkan::after { /* 取っ手は銀色 */
+  background: #c3ccd5;
+}
+
+/* ユニットバスの扉。白い樹脂の扉(形は .door と同じ。取っ手は銀色) */
+.door-bath {
+  background: #f3f3ef;
+  border-color: #b5b5ad;
+}
+
+.door-bath::before { /* 飾りの枠の代わりに、上のほうに細長いすりガラス */
+  inset: 10% 30% 60% 30%;
+  border: 2px solid #c9c9c1;
+  background: #dfe6ea;
+}
+
+.door-bath::after {
+  background: #a9b0b6;
+}
+
+/* トイレの扉(版34)。浴室の扉(白)と見分けられるよう、明るい木の扉にする。窓はない */
+.door-toilet {
+  background: #c9a77c;
+  border-color: #8a6340;
+}
+
+.door-toilet::before {
+  inset: 10% 18% 10% 18%;
+  border-color: rgba(0, 0, 0, 0.18);
+}
+
+.door-toilet::after {
+  background: #a9b0b6;
+}
+
+/* 机(天板+左の脚+右の引き出し) */
+.desk {
+  background:
+    linear-gradient(#5e3f22, #5e3f22) 0 0 / 100% 14% no-repeat,   /* 天板 */
+    linear-gradient(#7a5532, #7a5532) 0 0 / 8% 100% no-repeat,    /* 左の脚 */
+    linear-gradient(#8a6340, #8a6340) 100% 0 / 45% 100% no-repeat; /* 右の引き出しの箱 */
+}
+
+.desk::before { /* 引き出しの下の線 */
+  content: "";
+  position: absolute;
+  left: 55%;
+  right: 0;
+  top: 55%;
+  border-top: 2px solid #5e3f22;
+}
+
+.desk::after { /* 引き出しの取っ手 */
+  content: "";
+  position: absolute;
+  left: 70%;
+  top: 31%;
+  width: 15%;
+  height: 7%;
+  border-radius: 3px;
+  background: #d8c9a8;
+}
+
+/* 左右の矢印 */
+.arrow {
+  position: absolute;
+  top: 50%;
+  z-index: 1;
+  width: 44px;
+  height: 44px;
+  margin-top: -22px;
+  border: none;
+  border-radius: 50%;
+  background: rgba(0, 0, 0, 0.45);
+  color: #fff;
+  font-size: 1.1rem;
+}
+
+.arrow-left {
+  left: 4px;
+}
+
+.arrow-right {
+  right: 4px;
+}
+
+/* hidden 属性を付けたら確実に消す(display を指定した要素でも効くように) */
+[hidden] {
+  display: none !important;
+}
+
+/* メッセージ欄 */
+.message {
+  min-height: 3.2em;
+  margin: 10px 0;
+  padding: 8px 10px;
+  border-radius: 6px;
+  background: #1f1b18;
+  line-height: 1.6;
+}
+
+/* 持ち物 */
+.inventory h2,
+.debug-panel h2 {
+  margin: 0 0 6px;
+  font-size: 0.95rem;
+}
+
+.items {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  min-height: 44px;
+  align-items: center;
+}
+
+.item {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  min-height: 44px;
+  padding: 4px 10px;
+  border: 2px solid #6b5a4b;
+  border-radius: 6px;
+  background: #3d3530;
+  color: inherit;
+}
+
+.item.selected {
+  border-color: #ffd34d;
+  background: #5a4a2a;
+}
+
+/* 手に入れたばかりのアイテム(版31)。枠を1秒ほど金色に光らせる。js/render.js が、増えたアイテムにだけ付ける */
+@keyframes item-new {
+  0%, 40% { border-color: #ffd34d; box-shadow: 0 0 10px 2px rgba(255, 211, 77, 0.8); }
+  100%    { box-shadow: 0 0 0 0 rgba(255, 211, 77, 0); }
+}
+
+.item-new {
+  animation: item-new 1s ease-out;
+}
+
+/* OS で動きを減らす設定をしている人には、フェードと強調を付けない */
+@media (prefers-reduced-motion: reduce) {
+  .room-fade,
+  .item-new {
+    animation: none;
+  }
+}
+
+/* アイテムの絵(SVG のときも絵文字のときも同じくらいの大きさにする) */
+.item-icon {
+  font-size: 1.4rem;
+  line-height: 1;
+}
+
+.item-icon svg {
+  display: block;
+  width: 1.6rem;
+  height: 1.6rem;
+}
+
+/* 下部ボタン */
+.debug-panel button {
+  min-height: 44px;
+  padding: 4px 14px;
+  border: 1px solid #6b5a4b;
+  border-radius: 6px;
+  background: #4a403a;
+  color: inherit;
+}
+
+/* 開始画面・区切りの画面・クリア画面(画面全体を覆い、中身を中央に置く)。開始画面・クリア画面の絵と動きは下の .scene-〜 */
+.overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 10;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 20px;
+  background: rgba(20, 16, 13, 0.92);
+  text-align: center;
+}
+
+.overlay-title {
+  margin: 0;
+  font-size: 2rem;
+  font-weight: bold;
+  color: #ffd34d;
+}
+
+.overlay-message {
+  /* 文章が1行でも2行でも同じ高さにして、どの画面でもボタンの位置をそろえる */
+  min-height: 3.2em;
+  margin: 0;
+  line-height: 1.6;
+  white-space: pre-line; /* 文章の中の \n で改行する(開始画面の導入文) */
+}
+
+.overlay button {
+  min-height: 44px;
+  margin-top: 12px;
+  padding: 4px 20px;
+  border: 1px solid #6b5a4b;
+  border-radius: 6px;
+  background: #4a403a;
+  color: inherit;
+}
+
+/* 開始画面・クリア画面の中身は縮めない(文章が3行になったときに、縦の並びの中で押しつぶされて手紙と重なるのを防ぐ)。
+   万一画面に収まらないときは、画面の中をスクロールできるようにする */
+.overlay-scene {
+  overflow-y: auto;
+}
+
+.overlay-scene > * {
+  flex-shrink: 0;
+}
+
+/* 開始画面・クリア画面(版29)。上に扉の絵、下にタイトル・文章・ボタン。
+   絵の大きさは、横は画面幅の85%まで、縦は画面の高さの45%までに収める(縦長のスマホでも全体が1画面に入るように) */
+.scene-art {
+  width: min(360px, 85vw, 60vh); /* 絵の縦横比は 4:3 なので、幅 60vh で高さが 45vh になる */
+  aspect-ratio: 4 / 3;
+  margin-bottom: 8px;
+}
+
+.scene-art svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+  border-radius: 6px;
+}
+
+/* 動き。どちらの画面も、hidden を外して表示したときに最初から再生される。
+   animation-fill-mode: both で、始まる前は最初の姿(見えない・閉じた扉)、終わった後は最後の姿のままにする */
+@keyframes scene-fade-in {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+/* ボタンは、見えるようになるまで押せない(visibility: hidden の間はクリックもフォーカスもできない) */
+@keyframes scene-button-in {
+  from { opacity: 0; visibility: hidden; }
+  to   { opacity: 1; visibility: visible; }
+}
+
+/* 扉が蝶番(左端)を軸に開く。横に縮めて、手前に開いた扉を細く見せる */
+@keyframes scene-door-open {
+  from { transform: scaleX(1); }
+  to   { transform: scaleX(0.14); filter: brightness(0.7); }
+}
+
+.overlay-scene .scene-art {
+  animation: scene-fade-in 0.8s ease-out both;
+}
+
+/* 開始画面: タイトル → 導入文 → ボタン の順に表示(約1.6秒) */
+#start-screen .overlay-title   { animation: scene-fade-in 0.6s ease-out 0.3s both; }
+#start-screen .overlay-message { animation: scene-fade-in 0.6s ease-out 0.7s both; }
+#start-screen button           { animation: scene-button-in 0.5s ease-out 1.1s both; }
+
+/* クリア画面: 扉が開く → 光が広がる → タイトル → 文章 → 手紙 → ボタン(約3.6秒) */
+#clear-screen .scene-art { animation: none; } /* 絵は最初から見せて、扉の動きを見せる */
+
+/* クリア画面の絵の幅(版36)。手紙を絵に重ねる量の計算にも使うので、変数にまとめる。
+   画面の大きさごとの値は、下の @media で変える */
+#clear-screen {
+  --art-w: min(360px, 85vw, 60vh);
+}
+
+#clear-screen .scene-art {
+  width: var(--art-w);
+}
+.scene-door {
+  transform-box: fill-box;   /* 回転・伸縮の基準を、この扉の絵の範囲にする */
+  transform-origin: left center;
+  animation: scene-door-open 1.2s ease-in-out 0.3s both;
+}
+.scene-light {
+  animation: scene-fade-in 1.2s ease-out 0.8s both;
+}
+#clear-screen .overlay-title   { animation: scene-fade-in 0.5s ease-out 1.6s both; }
+#clear-screen .clear-time      { animation: scene-fade-in 0.5s ease-out 1.75s both; }
+#clear-screen .overlay-message { animation: scene-fade-in 0.5s ease-out 1.9s both; }
+#clear-screen .clear-letter    { animation: scene-fade-in 0.6s ease-out 2.4s both; }
+#clear-screen button           { animation: scene-button-in 0.5s ease-out 3.1s both; }
+
+/* クリア画面のクリアまでの時間(版35)。見出しの下に、少し小さく金色で出す */
+.clear-time {
+  margin: 0;
+  font-size: 0.9rem;
+  color: #ffd34d;
+}
+
+/* クリア画面の友人からの手紙(版33)。白い紙に、少し丸みのある濃い字で書いた見た目にする。
+   版36から、扉の絵の下から35%の高さぶんを重ねる(絵の高さ = 幅 × 0.75 なので、上へ 幅 × 0.75 × 0.35 ずらす)。
+   空と太陽が見えるよう、重ねるのは下のほう(開いた扉と床の光のあたり)だけにする */
+.clear-letter {
+  position: relative;
+  z-index: 1; /* 絵より手前に出す */
+  max-width: min(360px, 90vw);
+  margin: calc(var(--art-w) * -0.75 * 0.35) 0 4px;
+  padding: 10px 14px;
+  border-radius: 3px;
+  background: #fbf7ee;
+  color: #3a3028;
+  line-height: 1.6;
+  text-align: left;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.4);
+  transform: rotate(-1deg); /* 貼ってある紙らしく、少し傾ける */
+}
+
+/* OS で「視差効果を減らす」などを設定している人には、動かさずに完成した姿を出す */
+@media (prefers-reduced-motion: reduce) {
+  .overlay-scene *,
+  .overlay-scene .scene-art {
+    animation: none !important;
+  }
+  .scene-door {
+    transform: scaleX(0.14);
+    filter: brightness(0.7);
+  }
+}
+
+/* 縦長でも高さの小さいスマホ(高さ700px以下)では、クリア画面の絵を小さくして、時間・文章・手紙・ボタンを収める(版35) */
+@media (max-height: 700px) {
+  #clear-screen {
+    --art-w: min(360px, 85vw, 44vh);
+  }
+}
+
+/* 低い画面(横向きのスマホなど)では、絵を小さくして文字とボタンを収める */
+@media (max-height: 480px) {
+  .scene-art {
+    width: min(360px, 85vw, 40vh);
+  }
+  #clear-screen { /* クリア画面は手紙と時間があるので、絵をさらに小さくする */
+    --art-w: min(360px, 85vw, 18vh);
+  }
+  .overlay-scene {
+    gap: 4px;
+  }
+  .clear-letter {
+    margin-top: 0; /* 絵がとても小さいので重ねない */
+    padding: 6px 12px;
+    line-height: 1.5;
+  }
+  .overlay-title {
+    font-size: 1.5rem;
+  }
+}
+
+/* 錠の入力画面と、「最初から」の確認画面 */
+.lock-dialog,
+.confirm-dialog {
+  width: min(320px, 90vw);
+  padding: 16px;
+  border: 1px solid #6b5a4b;
+  border-radius: 8px;
+  background: #2f2a26;
+  color: inherit;
+  text-align: center;
+}
+
+.lock-dialog::backdrop,
+.confirm-dialog::backdrop {
+  background: rgba(0, 0, 0, 0.6); /* 後ろの画面を暗くする */
+}
+
+.lock-prompt {
+  margin: 0 36px 10px; /* 右上の「×」と文章が重ならないよう、左右を空ける */
+  line-height: 1.6;
+}
+
+.lock-display {
+  margin: 0;
+  font-family: ui-monospace, Menlo, Consolas, monospace;
+  font-size: 2rem;
+  letter-spacing: 0.4em;
+}
+
+.lock-note {
+  min-height: 1.5em;
+  margin: 6px 0 10px;
+  color: #ffb4a0;
+}
+
+.keypad {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+}
+
+/* 色の錠: 入力欄のマス。押した色で塗る(まだ押していないマスは空の枠) */
+.color-display {
+  display: flex;
+  justify-content: center;
+  gap: 10px;
+  min-height: 40px;
+}
+
+.color-slot {
+  width: 36px;
+  height: 36px;
+  border: 2px dashed #8a7a6b;
+  border-radius: 6px;
+}
+
+.color-slot.filled {
+  border: 2px solid #1f1b18;
+}
+
+/* 色の錠: 色のボタン(5色を1列に並べる) */
+.color-pad {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 6px;
+  margin-bottom: 8px;
+}
+
+.color-pad button {
+  min-height: 48px;
+  border: 2px solid #1f1b18;
+  border-radius: 6px;
+  font-size: 1rem;
+  font-weight: bold;
+}
+
+/* 色の錠の「消去」「決定」(2つを横に並べる) */
+.keypad-2 {
+  grid-template-columns: 1fr 1fr;
+}
+
+.confirm-dialog p {
+  margin: 0 0 14px;
+  line-height: 1.6;
+}
+
+.confirm-buttons {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+.keypad button,
+.confirm-buttons button {
+  min-height: 48px;
+  border: 1px solid #6b5a4b;
+  border-radius: 6px;
+  background: #4a403a;
+  color: inherit;
+  font-size: 1.1rem;
+}
+
+/* 「決定」は金色系で目立たせる(選択中のアイテムの枠と同じ色) */
+.keypad .lock-submit {
+  border: 2px solid #ffd34d;
+  background: #5a4a2a;
+  color: #ffd34d;
+  font-weight: bold;
+}
+
+/* 「閉じる」は入力画面の右上に置く「×」ボタン。決定から離して押し間違えを防ぐ */
+.lock-close {
+  position: absolute; /* モーダル表示の <dialog> を基準にした位置 */
+  top: 4px;
+  right: 4px;
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  border: none;
+  border-radius: 50%;
+  background: none;
+  color: inherit;
+  font-size: 1.6rem;
+  line-height: 1;
+}
+
+.lock-close:hover,
+.lock-close:focus-visible {
+  background: #4a403a;
+  outline: none;
+}
+
+/* デバッグパネル */
+.debug-panel {
+  margin-top: 20px;
+  padding: 10px;
+  border: 1px dashed #c96;
+  border-radius: 6px;
+}
+
+.debug-panel button {
+  margin: 0 6px 6px 0;
+}
+
+/* 面へ移動するボタンを、部屋ごとに1行にまとめる */
+.debug-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0 6px;
+}
+
+.debug-row span {
+  margin: 0 4px 6px 0;
+  font-size: 0.9rem;
+}

@@ -12,7 +12,7 @@ HTML / CSS / JavaScript だけで作っています。
 
 ## ゲームの概要
 
-- プレイ時間: 15分前後
+- プレイ時間: 20分前後
 - 対応環境: 最新版の Chrome / Edge / Safari / Firefox(PC・スマホの両方)
 - 音: なし
 

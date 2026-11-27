@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>鍵のかかった家 3D</title>
+<title>脱出ゲーム習作 3D</title>
 <script type="importmap">
 { "imports": { "three": "https://cdn.jsdelivr.net/npm/three@0.187.0/build/three.module.js" } }
 </script>
@@ -16,7 +16,7 @@ button{font:inherit;color:inherit}
 button:focus-visible{outline:3px solid var(--gold);outline-offset:2px}
 main{max-width:720px;margin:0 auto;padding:12px}
 
-#room{position:relative;width:100%;aspect-ratio:4/3;border-radius:8px;overflow:hidden;background:#000}
+#room{position:relative;width:min(100%, calc((100dvh - 230px) * 4 / 3));min-width:min(100%, 280px);margin:0 auto;aspect-ratio:4/3;border-radius:8px;overflow:hidden;background:#000}
 #room canvas{position:absolute;inset:0;width:100%;height:100%;display:block}
 #hit-layer{position:absolute;inset:0}
 #room-error{position:absolute;inset:0;display:grid;place-items:center;padding:16px;text-align:center;color:#ddd;font-size:15px}
@@ -90,6 +90,9 @@ main{max-width:720px;margin:0 auto;padding:12px}
 .ov-text{margin:0;min-height:3.2em;white-space:pre-line}
 .ov-btns{display:flex;flex-direction:column;gap:10px;width:min(100%,280px)}
 .letter{margin:0;padding:14px 16px;background:#fbf8f0;color:#333;border-radius:4px;transform:rotate(-1.5deg);box-shadow:0 4px 14px rgba(0,0,0,.4);text-align:left;font-size:15px}
+.lang{display:flex;gap:0;border:1px solid #6a6b7a;border-radius:8px;overflow:hidden}
+.lang button{min-height:40px;min-width:96px;padding:0 14px;border:0;background:#2c2d35;cursor:pointer;font-size:15px}
+.lang button[aria-pressed=true]{background:#4a3a12;color:var(--gold)}
 .btn{min-height:48px;border-radius:8px;border:1px solid #6a6b7a;background:#2c2d35;cursor:pointer;font-size:16px}
 .btn:hover:not(:disabled){background:#3b3c47}
 .btn:disabled{opacity:.35;cursor:default}
@@ -124,12 +127,14 @@ main{max-width:720px;margin:0 auto;padding:12px}
 <section class="overlay" id="title-screen" hidden>
   <div class="ov-inner">
     <div class="ov-pic appear" id="title-pic"></div>
-    <h2 class="appear d1">鍵のかかった家</h2>
-    <p class="ov-text appear d2">目が覚めると、知らない部屋にいた。
+    <p class="ov-text appear d1">目が覚めると、知らない部屋にいた。
 扉から外に出よう。</p>
-    <div class="ov-btns appear d3">
+    <div class="ov-btns appear d2">
       <button class="btn" id="btn-new">最初から始める</button>
       <button class="btn" id="btn-continue">続きから始める</button>
+    </div>
+    <div class="lang appear d2" role="group" aria-label="言語 / Language">
+      <button data-lang="ja">日本語</button><button data-lang="en">English</button>
     </div>
   </div>
 </section>
@@ -137,8 +142,8 @@ main{max-width:720px;margin:0 auto;padding:12px}
 <section class="overlay" id="clear-screen" hidden>
   <div class="ov-inner">
     <h2 class="appear">脱出成功！</h2>
-    <p class="ov-text appear d1">玄関から外に出た。外は朝だった。
-ドアに、見覚えのある丸っこい字の手紙が貼ってある。</p>
+    <p class="ov-text appear d1">玄関から外に出た。
+ドアに見覚えのある友人の字の手紙が貼ってある。</p>
     <p class="letter appear d2">おはよう。引っ越し祝いに来てくれたお礼に、脱出ゲームを用意しておいた。楽しんでくれた？ 朝ごはんを買いに行ってくる。</p>
     <div class="ov-btns appear d3"><button class="btn" id="btn-clear">タイトルに戻る</button></div>
   </div>
@@ -317,7 +322,10 @@ function makeBooks() {
         { zoom: { model: 'bookCover', arg: s => ({ volume: v, bookmark: bookmarkColor(s, v) }) },
           message: s => {
             const c = bookmarkColor(s, v);
-            return `『${BOOK_TITLE}』の第${v}巻だ。` + (c ? `${c.name}栞が挟まっている。` : '');
+            return {
+              ja: `『${BOOK_TITLE}』の第${v}巻だ。` + (c ? `${c.name}栞が挟まっている。` : ''),
+              en: `It's Volume ${v} of "${BOOK_TITLE_EN}."` + (c ? ` A ${c.id} bookmark is tucked inside.` : ''),
+            };
           } },
       ],
     };
@@ -623,6 +631,118 @@ const OBJECTS = [
 
 const NOTHING_HAPPENS = '何も起きない。';
 
+const BOOK_TITLE_EN = 'World Puzzles: The Complete Collection';
+const EN = {
+  '目が覚めると、知らない部屋にいた。\n扉から外に出よう。': "You wake up in a room you don't recognize.\nFind a way out through the door.",
+  '最初から始める': 'New Game', '続きから始める': 'Continue',
+  '台所': 'Kitchen',
+  '扉の先は台所だった。振り返ると、扉が閉まって鍵のかかる音がした。': 'Beyond the door was a kitchen. Behind you, the door swung shut and locked with a click.',
+  '進む': 'Continue',
+  '脱出成功！': 'You escaped!',
+  '玄関から外に出た。\nドアに見覚えのある友人の字の手紙が貼ってある。': "You stepped out the front door.\nA note in your friend's familiar handwriting is taped to it.",
+  'おはよう。引っ越し祝いに来てくれたお礼に、脱出ゲームを用意しておいた。楽しんでくれた？ 朝ごはんを買いに行ってくる。':
+    "Good morning! To thank you for coming to my housewarming, I set up an escape game for you. Did you enjoy it? I've gone out to get breakfast.",
+  'タイトルに戻る': 'Back to Title',
+  '左を向く': 'Turn left', '右を向く': 'Turn right', '戻る': 'Back', 'メニュー': 'Menu', '閉じる': 'Close', 'デバッグ': 'Debug',
+  '消去': 'Clear', '決定': 'OK', '赤': 'Red', '青': 'Blue', '黄': 'Yellow', '緑': 'Green', '白': 'White', '空き': 'Empty',
+  '3Dの絵を描く three.js を読み込めませんでした。<br>通信の状態を確かめて、再読み込みしてください。':
+    "Couldn't load three.js, which draws the 3D scenes.<br>Check your connection and reload the page.",
+  'このブラウザでは3Dの絵を描けませんでした。': "This browser couldn't draw the 3D scenes.",
+  '何も起きない。': 'Nothing happens.', '続きから始めます。': 'Continuing where you left off.',
+  '開かない。': "It won't open.", '暗くて見えない。': "It's too dark to see.",
+  '3桁の数字を合わせるようだ。': 'It seems to need a 3-digit code.', '4桁の数字を合わせるようだ。': 'It seems to need a 4-digit code.',
+  'ドライバー': 'Screwdriver', 'メモ1': 'Note 1', 'メモ2': 'Note 2', '小さな鍵': 'Small key', '懐中電灯': 'Flashlight',
+  '金色の鍵': 'Gold key', '鍵入りの氷': 'Key in ice', '古い鍵': 'Old key', '鈴の付いた鍵': 'Key with a bell',
+  '蛇口のハンドル': 'Faucet handle', 'コイン': 'Coin', '南京錠の鍵': 'Padlock key',
+  'メモには丸っこい字で「赤 → 青 → 黄」と書いてある。': 'In rounded handwriting, the note says "Red → Blue → Yellow."',
+  'メモには丸っこい字で「絵の裏を見よ」と書いてある。': 'In rounded handwriting, the note says "Look behind the painting."',
+  '扉': 'Door', '扉だ。鍵がかかっている。': "It's the door. It's locked.", '鍵穴に合わないようだ。': "It doesn't fit the keyhole.",
+  '鍵を差し込んで回した。扉が開いた！': 'You turned the key. The door opened!',
+  '壁の絵': 'Painting', '山と朝日の風景画だ。': "It's a landscape of mountains at sunrise.",
+  '山と朝日の風景画だ。絵を外して床に置くと、裏の壁に小さな金庫が埋め込まれていた！':
+    "It's a landscape of mountains at sunrise. You took it down and set it on the floor. A small safe is built into the wall behind it!",
+  '床に置いた絵': 'Painting on the floor',
+  '金庫': 'Safe', '小さな金庫だ。錠がついている。': "It's a small safe. It has a lock.",
+  '金庫が開いた。中に小さな鍵が入っている！': "The safe opened. There's a small key inside!",
+  '開いた金庫': 'Open safe', '金庫だ。扉は開いていて、中にはもう何もない。': "It's the safe. The door is open, and there's nothing left inside.",
+  '観葉植物': 'Potted plant', '観葉植物だ。鉢の土が少し盛り上がっている。': "It's a potted plant. The soil is slightly raised.",
+  '鉢の土に何か埋まっている……ドライバーだ！': 'Something is buried in the soil... a screwdriver!', 'ただの観葉植物だ。': "It's just a potted plant.",
+  'クローゼット': 'Closet', 'クローゼットだ。扉に板が打ち付けてあって開かない。': "It's a closet. A board is fixed across the doors, so it won't open.",
+  'クローゼットだ。鍵がかかっている。取っ手の下に小さな鍵穴がある。': "It's a closet. It's locked. There's a small keyhole below the handles.",
+  '板が邪魔で扉が開かない。': "The board is in the way. The doors won't open.",
+  '鍵を回すと、クローゼットの扉が開いた。': 'You turned the key, and the closet doors opened.',
+  '開いたクローゼット': 'Open closet', 'クローゼットだ。服が何着か掛かっている。': "It's the closet. A few clothes are hanging inside.",
+  '懐中電灯を手に入れた。': 'You got a flashlight.',
+  'クローゼットの板': 'Board', '板だ。ネジで留めてあるようだ。': "It's a board. It seems to be held on with screws.",
+  'ドライバーでネジを外し、板を取り外した。': 'You removed the screws with the screwdriver and took off the board.',
+  '窓': 'Window', '窓だ。はめ殺しで開かない。': "It's a window. It's fixed shut.",
+  'ゴミ箱': 'Trash can', 'ゴミ箱だ。中に、丸めた紙が捨ててある。': "It's a trash can. There's a crumpled piece of paper inside.",
+  '丸めた紙を広げるとメモだった。': "You smoothed out the paper. It's a note.", 'ゴミ箱だ。中はもう空っぽだ。': "It's the trash can. It's empty now.",
+  '本棚': 'Bookshelf', '2段の本棚だ。同じ装丁の本が10冊並んでいる。': "It's a two-shelf bookcase. Ten books with matching covers are lined up.",
+  '本': 'Book',
+  'ベッド': 'Bed', 'ベッドだ。ベッドの下は暗くて奥が見えない。': "It's a bed. It's too dark under it to see the back.",
+  '懐中電灯でベッドの下を照らすと、奥に鍵が落ちていた！': "You shined the flashlight under the bed. There's a key at the back!",
+  'ベッドだ。ベッドの下にはもう何もない。': "It's the bed. There's nothing else under it.",
+  '壁時計': 'Wall clock', '壁時計だ。止まっているようだ。': "It's a wall clock. It seems to have stopped.",
+  '机': 'Desk', '机だ。引き出しに錠がついている。': "It's a desk. The drawer has a lock.",
+  '引き出しが開いた。中にメモが入っている。': "The drawer opened. There's a note inside.",
+  '机だ。引き出しは開いている。中にはもう何もない。': "It's the desk. The drawer is open, and there's nothing left inside.",
+  '入ってきた扉': 'Door you came through', 'さっきの部屋の扉だ。こちら側からは開かない。': "It's the door to the room you came from. It won't open from this side.",
+  'トイレの扉': 'Toilet door', 'トイレに入った。': 'You went into the toilet.',
+  '浴室の扉': 'Bathroom door', '洗面所に入った。': 'You went into the washroom.',
+  '点検口': 'Access panel', '点検口だ。四隅がマイナスねじで留めてある。': "It's an access panel. Flat-head screws hold each corner.",
+  'コインでねじを回して、点検口のふたを外した。中に小さな箱がある。': "You turned the screws with the coin and took off the cover. There's a small box inside.",
+  '点検口の中の箱': 'Box in the panel', '点検口の中の箱だ。錠がついている。': "It's the box in the access panel. It has a lock.",
+  '箱が開いた。中に南京錠の鍵が入っている！': "The box opened. There's a padlock key inside!",
+  '点検口の中の箱だ。もう何も入っていない。': "It's the box in the access panel. It's empty now.",
+  '玄関の扉': 'Front door', 'ドアチェーン': 'Door chain',
+  '玄関の扉だ。鍵がかかっていて、ドアチェーンにも南京錠がかかっている。': "It's the front door. It's locked, and the door chain has a padlock on it too.",
+  '玄関の扉だ。鍵は開いたが、ドアチェーンの南京錠が外れない。': "It's the front door. The lock is open, but the padlock on the chain won't come off.",
+  '玄関の扉だ。ドアチェーンは外したが、鍵がかかっている。': "It's the front door. The chain is off, but it's still locked.",
+  '鍵を回した。あとはドアチェーンだ。': 'You turned the key. Now just the door chain.',
+  '鍵を回すと、玄関の扉が開いた！': 'You turned the key, and the front door opened!',
+  '南京錠を外して、ドアチェーンを外した。あとは鍵だ。': 'You removed the padlock and took off the chain. Now just the lock.',
+  '南京錠を外してドアチェーンを外すと、玄関の扉が開いた！': 'You removed the padlock and the chain, and the front door opened!',
+  '靴箱': 'Shoe cabinet', '靴箱だ。靴はなく、工具箱が置いてある。': "It's a shoe cabinet. There are no shoes, just a toolbox.",
+  '工具箱を開けると、蛇口のハンドルが入っていた。': "You opened the toolbox. There's a faucet handle inside.",
+  '靴箱だ。工具箱のほかには何も入っていない。': "It's the shoe cabinet. There's nothing but the toolbox.",
+  '冷蔵庫': 'Fridge', '冷蔵庫だ。冷蔵室の中は空っぽだ。': "It's a fridge. The fridge section is empty.",
+  '冷凍室': 'Freezer', '冷凍室だ。製氷皿に、鍵が閉じ込められた氷がある。': "It's the freezer. In the ice tray, there's a key frozen in ice.",
+  '鍵入りの氷を取り出した。': 'You took out the key frozen in ice.', '冷凍室だ。もう何も入っていない。': "It's the freezer. It's empty now.",
+  '流し台': 'Sink', '流し台だ。蛇口をひねると水が出る。': "It's the sink. Water comes out when you turn the tap.",
+  '流しの下の戸棚': 'Cabinet under the sink', '流しの下の戸棚だ。鍵がかかっている。古そうな鍵穴だ。': "It's the cabinet under the sink. It's locked. The keyhole looks old.",
+  '戸棚が開いた。中に皿が重ねてしまってある。': "The cabinet opened. There's a stack of plates inside.",
+  '開いた戸棚': 'Open cabinet', '流しの下の戸棚だ。色の違う皿が4枚重ねてある。': "It's the cabinet under the sink. Four plates of different colors are stacked inside.",
+  '冷凍グラタンの空き箱': 'Empty gratin box',
+  '冷凍グラタンの空き箱だ。『温め 600W 3分 ／ 解凍 600W 1分30秒』と書いてある。': `It's an empty frozen gratin box. It says "Reheat: 600W 3 min / Defrost: 600W 1 min 30 sec."`,
+  '電子レンジ': 'Microwave', '電子レンジだ。中は空っぽだ。': "It's a microwave. It's empty.", '氷を電子レンジに入れた。': 'You put the ice in the microwave.',
+  '電子レンジだ。中に、鍵入りの氷が入っている。': "It's the microwave. The key frozen in ice is inside.",
+  '温め時間を「分:秒」で入力する。例えば2分05秒なら「2:05」。': 'Enter the time as "minutes:seconds." For 2 min 05 sec, enter "2:05."',
+  'うまくいかないようだ。': "That doesn't seem to work.", '氷が溶けて、中から鍵が出てきた。': 'The ice melted, and a key came out.',
+  '食器棚': 'Cupboard', '食器棚だ。ガラス戸に色のボタンの錠がついている。': "It's a cupboard. The glass doors have a lock with colored buttons.",
+  '『下から順に』と彫ってある。': '"From the bottom up" is engraved on it.',
+  '食器棚のガラス戸が開いた。中に鍵が入っている！': "The cupboard's glass doors opened. There's a key inside!",
+  '開いた食器棚': 'Open cupboard', '食器棚だ。もう何も入っていない。': "It's the cupboard. It's empty now.",
+  '台所への扉': 'Door to the kitchen', '台所に戻った。': 'You went back to the kitchen.',
+  '洗面台': 'Washbasin', '洗面台だ。蛇口をひねると水が出る。': "It's a washbasin. Water comes out when you turn the tap.",
+  '鏡': 'Mirror', '鏡だ。洗面台の上に付いている。': "It's a mirror above the washbasin.", '鏡に記号が3つ浮かび上がっている。': 'Three symbols have appeared on the mirror.',
+  '浴槽': 'Bathtub', '浴槽だ。蛇口のハンドルが外れていて、お湯が出せない。': "It's a bathtub. The faucet handle is missing, so you can't run hot water.",
+  'ハンドルを取り付けて蛇口をひねると、お湯が出てきた。湯気が立ちこめる。': 'You attached the handle and turned the faucet. Hot water poured out, and steam filled the room.',
+  '浴槽だ。お湯が出ていて、湯気が立ちこめている。': "It's the bathtub. Hot water is running, and the room is full of steam.",
+  '照明のスイッチ': 'Light switch', 'スイッチだ。押すと、明かりが消えた。': "It's a switch. You pressed it, and the light went out.",
+  'スイッチだ。押すと、明かりが点いた。': "It's a switch. You pressed it, and the light came on.",
+  'トイレ': 'Toilet', 'トイレだ。': "It's a toilet.",
+  '小物入れ': 'Small box', '小物入れだ。錠がついている。': "It's a small box. It has a lock.",
+  '小物入れが開いた。中にコインが入っている！': "The small box opened. There's a coin inside!", '小物入れだ。もう何も入っていない。': "It's the small box. It's empty now.",
+  '壁の線': 'Lines on the wall', '壁に何か書いてある。': 'Something is written on the wall.', '暗がりに光る線が浮かび上がっている。': 'Glowing lines appear in the dark.',
+};
+const ITEM_SELECT_EN = {
+  driver: "It's a screwdriver.", closetKey: "It's a small key.", flashlight: "It's a flashlight.", doorKey: "It's a gold key.",
+  iceKey: "It's a key frozen in ice.", oldKey: "It's an old key.", bellKey: "It's a key with a bell on it.",
+  tapHandle: "It's a faucet handle.", coin: "It's a coin.", padlockKey: "It's a padlock key.",
+};
+
+
 const START_SCENE_SVG = `
 <svg viewBox="0 0 240 180" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
   <rect width="240" height="150" fill="#2e3540"/>
@@ -657,13 +777,21 @@ const START_SCENE_SVG = `
   const btnDivider = document.getElementById('btn-divider');
   document.getElementById('title-pic').innerHTML = START_SCENE_SVG;
 
+  const LANG_KEY = 'shusaku1-3d-lang';
+  let lang = 'ja';
+  try { if (localStorage.getItem(LANG_KEY) === 'en') lang = 'en'; } catch (e) {  }
+  function tr(x) {
+    if (x && typeof x === 'object') return x[lang] ?? x.ja;
+    return lang === 'en' && EN[x] !== undefined ? EN[x] : x;
+  }
+
   let THREE = null;
   try {
     THREE = await import('three');
   } catch (e) {
     console.error(e);
     roomBox.insertAdjacentHTML('beforeend',
-      '<div id="room-error">3Dの絵を描く three.js を読み込めませんでした。<br>通信の状態を確かめて、再読み込みしてください。</div>');
+      `<div id="room-error">${tr('3Dの絵を描く three.js を読み込めませんでした。<br>通信の状態を確かめて、再読み込みしてください。')}</div>`);
   }
 
   let state = null;
@@ -1572,7 +1700,7 @@ const START_SCENE_SVG = `
       renderer = new THREE.WebGLRenderer({ antialias: true });
     } catch (e) {
       console.error(e);
-      roomBox.insertAdjacentHTML('beforeend', '<div id="room-error">このブラウザでは3Dの絵を描けませんでした。</div>');
+      roomBox.insertAdjacentHTML('beforeend', `<div id="room-error">${tr('このブラウザでは3Dの絵を描けませんでした。')}</div>`);
       return false;
     }
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
@@ -1641,8 +1769,6 @@ const START_SCENE_SVG = `
   for (const obj of OBJECTS) {
     const b = document.createElement('button');
     b.className = 'object';
-    b.setAttribute('aria-label', obj.label);
-    b.title = obj.label;
     b.hidden = true;
     b.addEventListener('click', () => onObjectClick(obj));
     hitLayer.appendChild(b);
@@ -1702,7 +1828,7 @@ const START_SCENE_SVG = `
     placeButtons(w, h);
   }
 
-  function setMessage(text) { messageBox.textContent = text; }
+  function setMessage(text) { messageBox.textContent = tr(text); }
 
   function renderAll(fade) {
     drawRoom();
@@ -1730,8 +1856,8 @@ const START_SCENE_SVG = `
       b.className = 'slot';
       if (id) {
         b.innerHTML = ITEMS[id].svg;
-        b.setAttribute('aria-label', ITEMS[id].name);
-        b.title = ITEMS[id].name;
+        b.setAttribute('aria-label', tr(ITEMS[id].name));
+        b.title = tr(ITEMS[id].name);
         b.setAttribute('aria-pressed', String(selected === id));
         if (selected === id) b.classList.add('selected');
         if (flashItem === id) b.classList.add('flash');
@@ -1741,13 +1867,13 @@ const START_SCENE_SVG = `
             setMessage(ITEMS[id].memo);
           } else {
             selected = selected === id ? null : id;
-            if (selected) setMessage(ITEMS[id].desc || `${ITEMS[id].name}だ。`);
+            if (selected) setMessage(lang === 'en' ? ITEM_SELECT_EN[id] : (ITEMS[id].desc || `${ITEMS[id].name}だ。`));
           }
           renderSlots();
         });
       } else {
         b.disabled = true;
-        b.setAttribute('aria-label', '空き');
+        b.setAttribute('aria-label', tr('空き'));
       }
       slotsBox.appendChild(b);
     }
@@ -1758,7 +1884,8 @@ const START_SCENE_SVG = `
     closeMenu();
     zoomView = null;
     dividerScreen.hidden = true;
-    btnContinue.disabled = !load();
+    const saved = load();
+    btnContinue.disabled = !saved || !!saved.flags.entranceOpen;
     titleScreen.hidden = false;
     document.getElementById('btn-new').focus({ preventScroll: true });
   }
@@ -1783,7 +1910,7 @@ const START_SCENE_SVG = `
   function showDivider(debug) {
     closeMenu();
     dividerDebug = debug;
-    btnDivider.textContent = debug ? '閉じる' : '進む';
+    btnDivider.textContent = tr(debug ? '閉じる' : '進む');
     dividerScreen.hidden = false;
   }
   document.getElementById('btn-new').addEventListener('click', () => startGame(newState(), ''));
@@ -1810,10 +1937,10 @@ const START_SCENE_SVG = `
     for (const k of keys) {
       const b = document.createElement('button');
       const color = LOCK_COLORS.find(c => c.id === k);
-      if (k === 'clear') { b.textContent = '消去'; b.className = 'small'; }
-      else if (k === 'ok') { b.textContent = '決定'; b.className = 'small ok'; }
+      if (k === 'clear') { b.textContent = tr('消去'); b.className = 'small'; }
+      else if (k === 'ok') { b.textContent = tr('決定'); b.className = 'small ok'; }
       else if (lock.type === 'color') {
-        b.textContent = color.name; b.className = 'small';
+        b.textContent = tr(color.name); b.className = 'small';
         b.style.background = color.hex; b.style.color = color.text;
       } else b.textContent = k;
       b.addEventListener('click', () => pressKey(k));
@@ -1843,7 +1970,7 @@ const START_SCENE_SVG = `
     currentLock = lock;
     typed = lock.type === 'color' ? [] : '';
     buildKeypad(lock);
-    document.getElementById('lock-prompt').textContent = lock.prompt;
+    document.getElementById('lock-prompt').textContent = tr(lock.prompt);
     lockNote.textContent = '';
     renderLockDisplay();
     lockDialog.showModal();
@@ -1859,7 +1986,9 @@ const START_SCENE_SVG = `
     } else if (k === 'ok') {
       const value = isColor ? typed.join(',') : typed;
       if (typed.length < n) {
-        lockNote.textContent = isColor ? `${n}つの色を入力してください。` : `${n}桁の数字を入力してください。`;
+        lockNote.textContent = lang === 'en'
+          ? (isColor ? `Enter ${n} colors.` : `Enter ${n} digits.`)
+          : (isColor ? `${n}つの色を入力してください。` : `${n}桁の数字を入力してください。`);
       } else if (value === String(valueOf(currentLock.answer))) {
         const lock = currentLock;
         lockDialog.close();
@@ -1867,7 +1996,7 @@ const START_SCENE_SVG = `
         return;
       } else {
         typed = isColor ? [] : '';
-        lockNote.textContent = currentLock.fail || '開かない。';
+        lockNote.textContent = tr(currentLock.fail || '開かない。');
       }
     } else if (typed.length < n) {
       typed = isColor ? [...typed, k] : typed + k;
@@ -1884,8 +2013,8 @@ const START_SCENE_SVG = `
   document.getElementById('arrow-right').addEventListener('click', () => goFace(FACES[state.face].right));
 
   function menuItems() {
-    const list = [['タイトルに戻る', showTitle]];
-    if (DEBUG) list.push(['デバッグ', openDebug]);
+    const list = [[tr('タイトルに戻る'), showTitle]];
+    if (DEBUG) list.push([tr('デバッグ'), openDebug]);
     return list;
   }
   function openMenu() {
@@ -1960,6 +2089,26 @@ const START_SCENE_SVG = `
   function closeDebug() { debugScreen.hidden = true; }
   document.getElementById('debug-close').addEventListener('click', closeDebug);
   debugScreen.addEventListener('click', e => { if (e.target === debugScreen) closeDebug(); });
+
+  const TEXT_TARGETS = ['#title-screen .ov-text', '#btn-new', '#btn-continue', '#clear-screen h2', '#clear-screen .ov-text',
+    '#clear-screen .letter', '#btn-clear', '#divider-screen h2', '#divider-screen .ov-text'];
+  const LABEL_TARGETS = ['#arrow-left', '#arrow-right', '#arrow-back', '#menu-btn', '#lock-close'];
+  TEXT_TARGETS.forEach(sel => { const el = document.querySelector(sel); el.dataset.t = el.textContent; });
+  LABEL_TARGETS.forEach(sel => { const el = document.querySelector(sel); el.dataset.tLabel = el.getAttribute('aria-label'); });
+  function applyLang() {
+    document.documentElement.lang = lang;
+    document.querySelectorAll('[data-t]').forEach(el => { el.textContent = tr(el.dataset.t); });
+    document.querySelectorAll('[data-t-label]').forEach(el => { el.setAttribute('aria-label', tr(el.dataset.tLabel)); });
+    for (const obj of OBJECTS) { buttons[obj.id].setAttribute('aria-label', tr(obj.label)); buttons[obj.id].title = tr(obj.label); }
+    document.querySelectorAll('.lang button').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.lang === lang)));
+    if (state) renderSlots();
+  }
+  document.querySelectorAll('.lang button').forEach(b => b.addEventListener('click', () => {
+    lang = b.dataset.lang;
+    try { localStorage.setItem(LANG_KEY, lang); } catch (e) {  }
+    applyLang();
+  }));
+  applyLang();
 
   if (THREE && buildScene()) {
     const resizeObserver = new ResizeObserver(() => drawRoom());

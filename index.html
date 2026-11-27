@@ -1,155 +1,1972 @@
 <!DOCTYPE html>
 <html lang="ja">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>鍵のかかった家</title>
-  <link rel="stylesheet" href="style.css">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>鍵のかかった家 3D</title>
+<script type="importmap">
+{ "imports": { "three": "https://cdn.jsdelivr.net/npm/three@0.187.0/build/three.module.js" } }
+</script>
+<style>
+:root{--bg:#15161a;--panel:#23242b;--line:#3a3b45;--ink:#eceae6;--muted:#a9a6a0;--gold:#e0b84a}
+*{box-sizing:border-box;min-width:0}
+html,body{background:var(--bg);color:var(--ink)}
+body{margin:0;font:16px/1.6 system-ui,"Hiragino Sans","Noto Sans JP",sans-serif;overflow-x:clip}
+button{font:inherit;color:inherit}
+button:focus-visible{outline:3px solid var(--gold);outline-offset:2px}
+main{max-width:720px;margin:0 auto;padding:12px}
+
+#room{position:relative;width:100%;aspect-ratio:4/3;border-radius:8px;overflow:hidden;background:#000}
+#room canvas{position:absolute;inset:0;width:100%;height:100%;display:block}
+#hit-layer{position:absolute;inset:0}
+#room-error{position:absolute;inset:0;display:grid;place-items:center;padding:16px;text-align:center;color:#ddd;font-size:15px}
+.object{position:absolute;background:transparent;border:0;padding:0;margin:0;cursor:pointer;border-radius:4px}
+.show-hits .object{outline:2px dashed #ff4d6d;background:rgba(255,77,109,.15)}
+#room.fade{animation:fade .2s ease-out}
+@keyframes fade{from{opacity:0}to{opacity:1}}
+
+.arrows{display:grid;grid-template-columns:72px 1fr 72px;margin-top:8px}
+#arrow-left{grid-column:1}#arrow-back{grid-column:2;justify-self:center}#arrow-right{grid-column:3}
+.arrow[hidden]{display:none}
+.arrow{width:72px;height:44px;border:1px solid #55566a;background:var(--panel);border-radius:8px;cursor:pointer;display:grid;place-items:center}
+.arrow:hover{background:#2f3039}
+.arrow span{width:14px;height:18px;background:var(--ink);clip-path:polygon(100% 0,0 50%,100% 100%)}
+#arrow-right span{clip-path:polygon(0 0,100% 50%,0 100%)}
+#arrow-back span{width:18px;height:14px;clip-path:polygon(0 0,100% 0,50% 100%)}
+
+#message{margin-top:8px;min-height:4.8em;padding:10px 14px;background:var(--panel);border:1px solid var(--line);border-radius:8px}
+
+.bar{display:flex;gap:8px;margin-top:8px;align-items:center}
+.slots{flex:1;display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px}
+.slot{height:56px;border:1px solid var(--line);background:var(--panel);border-radius:8px;display:grid;place-items:center;padding:0;cursor:pointer}
+.slot:disabled{cursor:default}
+.slot svg{width:36px;height:36px;display:block}
+.slot.selected{border-color:var(--gold);box-shadow:inset 0 0 0 2px var(--gold)}
+.slot.flash{animation:flash 1s ease-out}
+@keyframes flash{0%,100%{background:var(--panel)}25%{background:#6b5418}}
+.menu-wrap{position:relative;flex:none}
+#menu-btn{width:44px;height:44px;border:1px solid #6a6b7a;background:#33343d;border-radius:8px;cursor:pointer;display:flex;flex-direction:column;justify-content:center;align-items:center;gap:5px;padding:0}
+#menu-btn span{width:20px;height:2px;background:#fff;border-radius:1px}
+#menu-btn:hover,#menu-btn[aria-expanded=true]{background:#4a4b57}
+#menu{position:absolute;right:0;bottom:calc(100% + 8px);width:240px;max-height:70vh;overflow:auto;background:#2c2d35;border:1px solid #55566a;border-radius:8px;padding:6px;z-index:5;box-shadow:0 8px 24px rgba(0,0,0,.45)}
+#menu button{display:block;width:100%;min-height:44px;padding:8px 12px;text-align:left;background:none;border:0;border-radius:6px;cursor:pointer}
+#menu button:hover{background:#3b3c47}
+
+#lock{width:min(92vw,340px);padding:18px 16px 16px;border:1px solid #55566a;border-radius:12px;background:#23242b;color:var(--ink)}
+#lock::backdrop{background:rgba(0,0,0,.6)}
+.lock-prompt{margin:0 40px 6px 0}
+.lock-display{display:flex;justify-content:center;gap:12px;margin:10px 0 2px;font-size:30px;font-weight:bold;font-variant-numeric:tabular-nums}
+.lock-display span{width:1.1em;border-bottom:2px solid #8a8b99;text-align:center;line-height:1.3}
+.lock-display span.sep{width:auto;border:0}
+.lock-display span.cbox{width:36px;height:36px;border:2px solid #8a8b99;border-radius:6px}
+.lock-display span.cbox.empty{border-style:dashed;background:none}
+.lock-note{min-height:1.7em;margin:4px 0 8px;text-align:center;color:#f0c674}
+.keypad{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
+.keypad button{min-height:52px;font-size:20px;border:1px solid #55566a;background:#2c2d35;border-radius:8px;cursor:pointer}
+.keypad button:hover{background:#3b3c47}
+.keypad .small{font-size:16px}
+.keypad .ok{border-color:var(--gold);color:var(--gold);background:#4a3a12}
+.keypad .ok:hover{background:#5c4816}
+#lock-close{position:absolute;top:8px;right:8px;width:44px;height:44px;border:0;background:none;border-radius:6px;cursor:pointer;font-size:24px;line-height:1}
+#lock-close:hover{background:#3b3c47}
+
+.overlay.debug{z-index:20;background:rgba(10,11,14,.8)}
+.debug-panel{width:min(100%,360px);margin:auto;background:#2c2d35;border:1px solid #55566a;border-radius:10px;padding:8px 8px 10px;box-shadow:0 12px 32px rgba(0,0,0,.5)}
+.debug-head{display:flex;align-items:center;justify-content:space-between;padding:0 0 4px 12px}
+.debug-head h2{margin:0;font-size:18px}
+#debug-close{width:44px;height:44px;border:0;background:none;border-radius:6px;cursor:pointer;font-size:24px;line-height:1}
+#debug-close:hover{background:#3b3c47}
+.debug-group{font-size:13px;color:var(--muted);padding:10px 12px 2px;border-top:1px solid #45465a;margin-top:4px}
+#debug-list button{display:block;width:100%;min-height:44px;padding:8px 12px;text-align:left;background:none;border:0;border-radius:6px;cursor:pointer}
+#debug-list button:hover{background:#3b3c47}
+.debug-info{padding:6px 12px;font-variant-numeric:tabular-nums}
+
+.overlay{position:fixed;inset:0;z-index:10;display:flex;align-items:center;justify-content:center;padding:16px;background:#111318;overflow:auto}
+.overlay[hidden]{display:none}
+.ov-inner{width:min(100%,420px);display:flex;flex-direction:column;align-items:center;gap:14px;text-align:center;margin:auto}
+.ov-inner>*{flex-shrink:0}
+.ov-pic svg{width:min(80vw,340px);height:auto;display:block;border-radius:6px}
+.ov-inner h2{margin:0;font-size:30px;line-height:1.2}
+.ov-text{margin:0;min-height:3.2em;white-space:pre-line}
+.ov-btns{display:flex;flex-direction:column;gap:10px;width:min(100%,280px)}
+.letter{margin:0;padding:14px 16px;background:#fbf8f0;color:#333;border-radius:4px;transform:rotate(-1.5deg);box-shadow:0 4px 14px rgba(0,0,0,.4);text-align:left;font-size:15px}
+.btn{min-height:48px;border-radius:8px;border:1px solid #6a6b7a;background:#2c2d35;cursor:pointer;font-size:16px}
+.btn:hover:not(:disabled){background:#3b3c47}
+.btn:disabled{opacity:.35;cursor:default}
+@media (max-height:640px){.ov-pic svg{width:min(60vw,220px)}}
+.appear{animation:appear .4s ease-out both}
+.d1{animation-delay:.4s}.d2{animation-delay:.8s}.d3{animation-delay:1.2s}
+@keyframes appear{from{opacity:0;visibility:hidden}to{opacity:1;visibility:visible}}
+
+@media (prefers-reduced-motion:reduce){*,*::before,*::after{animation:none!important}}
+</style>
 </head>
 <body>
-  <main class="game">
-    <!-- 上の帯: 左端にメニューボタン(版37)、中央に今いる面の名前 -->
-    <div class="topbar">
-      <!-- メニューボタン。三本線は CSS で描く(絵文字の「☰」は OS によって見た目が変わるため使わない) -->
-      <button id="menu-button" class="menu-button" aria-label="メニュー" aria-expanded="false" aria-controls="menu-list">
-        <span></span><span></span><span></span>
-      </button>
-      <h1 id="wall-name" class="wall-name"></h1>
-      <!-- メニューの中身。押し間違いを防ぐため、画面の下に並べていたボタンをここにまとめた(版37)。
-           開き方・閉じ方は js/main.js の setupMenu -->
-      <div id="menu-list" class="menu-list" hidden>
-        <button id="reset-button">最初から</button>
-        <!-- 動作確認用。アーティファクト版(1ファイル版)だけで表示する(js/debug.js の setupQuickStart) -->
-        <button id="start-room1" hidden>1部屋目から</button>
-        <button id="start-room2" hidden>2部屋目から</button>
-      </div>
+<main>
+  <div id="room">
+    <div id="hit-layer"></div>
+  </div>
+  <div class="arrows">
+    <button class="arrow" id="arrow-left" aria-label="左を向く"><span></span></button>
+    <button class="arrow" id="arrow-back" aria-label="戻る" hidden><span></span></button>
+    <button class="arrow" id="arrow-right" aria-label="右を向く"><span></span></button>
+  </div>
+  <div id="message" aria-live="polite"></div>
+  <div class="bar">
+    <div class="slots" id="slots"></div>
+    <div class="menu-wrap">
+      <div id="menu" hidden></div>
+      <button id="menu-btn" aria-label="メニュー" aria-expanded="false" aria-controls="menu"><span></span><span></span><span></span></button>
     </div>
+  </div>
+</main>
 
-    <!-- 部屋の面。中身(物のボタン)は js/render.js が作る -->
-    <div class="room-frame">
-      <button id="go-left" class="arrow arrow-left" aria-label="左を向く">◀</button>
-      <div id="room" class="room"></div>
-      <button id="go-right" class="arrow arrow-right" aria-label="右を向く">▶</button>
+<section class="overlay" id="title-screen" hidden>
+  <div class="ov-inner">
+    <div class="ov-pic appear" id="title-pic"></div>
+    <h2 class="appear d1">鍵のかかった家</h2>
+    <p class="ov-text appear d2">目が覚めると、知らない部屋にいた。
+扉から外に出よう。</p>
+    <div class="ov-btns appear d3">
+      <button class="btn" id="btn-new">最初から始める</button>
+      <button class="btn" id="btn-continue">続きから始める</button>
     </div>
+  </div>
+</section>
 
-    <!-- メッセージ欄。aria-live で読み上げソフトにも変化を伝える -->
-    <p id="message" class="message" aria-live="polite"></p>
+<section class="overlay" id="clear-screen" hidden>
+  <div class="ov-inner">
+    <h2 class="appear">脱出成功！</h2>
+    <p class="ov-text appear d1">玄関から外に出た。外は朝だった。
+ドアに、見覚えのある丸っこい字の手紙が貼ってある。</p>
+    <p class="letter appear d2">おはよう。引っ越し祝いに来てくれたお礼に、脱出ゲームを用意しておいた。楽しんでくれた？ 朝ごはんを買いに行ってくる。</p>
+    <div class="ov-btns appear d3"><button class="btn" id="btn-clear">タイトルに戻る</button></div>
+  </div>
+</section>
 
-    <!-- 持ち物欄 -->
-    <section class="inventory">
-      <h2>持ち物</h2>
-      <div id="items" class="items"></div>
-    </section>
+<section class="overlay" id="divider-screen" hidden>
+  <div class="ov-inner">
+    <h2>台所</h2>
+    <p class="ov-text">扉の先は台所だった。振り返ると、扉が閉まって鍵のかかる音がした。</p>
+    <div class="ov-btns"><button class="btn" id="btn-divider">タイトルに戻る</button></div>
+  </div>
+</section>
 
+<dialog id="lock">
+  <p class="lock-prompt" id="lock-prompt"></p>
+  <div class="lock-display" id="lock-display" aria-live="polite"></div>
+  <p class="lock-note" id="lock-note" aria-live="polite"></p>
+  <div class="keypad" id="keypad"></div>
+  <button id="lock-close" aria-label="閉じる">×</button>
+</dialog>
 
-    <!-- 開始画面・区切りの画面・クリア画面。どれも画面全体に重ねて表示する(overlay)。
-         開始画面とクリア画面は、上に扉の絵、下にタイトル・文章・ボタンを置く(overlay-scene。版29)。
-         絵は js/render.js が data/svg.js の START_SCENE_SVG / CLEAR_SCENE_SVG から入れる。
-         区切りの画面は絵なし -->
-    <section id="start-screen" class="overlay overlay-scene" hidden>
-      <div id="start-art" class="scene-art"></div>
-      <p id="start-title" class="overlay-title"></p>
-      <p id="start-message" class="overlay-message"></p>
-      <button id="start-button">ゲーム開始</button>
-    </section>
-    <section id="room-screen" class="overlay" hidden>
-      <p id="room-title" class="overlay-title"></p>
-      <p id="room-message" class="overlay-message"></p>
-      <button id="room-button">進む</button>
-    </section>
-    <section id="clear-screen" class="overlay overlay-scene" hidden>
-      <div id="clear-art" class="scene-art"></div>
-      <!-- 友人からの手紙(版33)。文章は data/game.js の clear.letter。
-           版36から、扉の絵の下のほうに重ねて表示する(貼り紙らしく見せるため)ので、絵のすぐ後に書く -->
-      <p id="clear-letter" class="clear-letter"></p>
-      <p id="clear-title" class="overlay-title"></p>
-      <!-- クリアまでの時間とベスト(版35)。文章は js/render.js の clearTimeText() -->
-      <p id="clear-time" class="clear-time"></p>
-      <p id="clear-message" class="overlay-message"></p>
-      <button id="clear-restart">最初から</button>
-    </section>
-
-    <!-- 「最初から」の確認画面。ブラウザ標準の confirm() は埋め込み表示などで使えないことがあるので自作する -->
-    <dialog id="confirm-dialog" class="confirm-dialog">
-      <p>最初からやり直しますか？</p>
-      <div class="confirm-buttons">
-        <button id="confirm-yes">やり直す</button>
-        <button id="confirm-no">やめる</button>
-      </div>
-    </dialog>
-
-    <!-- 数字の錠の入力画面。<dialog> は画面の上に重ねて表示できる HTML の部品 -->
-    <dialog id="lock-dialog" class="lock-dialog">
-      <p id="lock-prompt" class="lock-prompt"></p>
-      <p id="lock-display" class="lock-display"></p>
-      <p id="lock-note" class="lock-note" aria-live="polite"></p>
-      <div class="keypad">
-        <button data-digit="1">1</button>
-        <button data-digit="2">2</button>
-        <button data-digit="3">3</button>
-        <button data-digit="4">4</button>
-        <button data-digit="5">5</button>
-        <button data-digit="6">6</button>
-        <button data-digit="7">7</button>
-        <button data-digit="8">8</button>
-        <button data-digit="9">9</button>
-        <button id="lock-clear">消去</button>
-        <button data-digit="0">0</button>
-        <button id="lock-submit" class="lock-submit">決定</button>
-      </div>
-      <!-- 「閉じる」は「決定」と押し間違えないよう、決定から遠い右上に「×」で置く(位置は CSS で指定)。
-           入力画面を開いたときに最初のボタンへ自動で移る選択(フォーカス)が「×」に当たらないよう、最後に書く -->
-      <button id="lock-close" class="lock-close" aria-label="閉じる">×</button>
-    </dialog>
-
-    <!-- 色の錠の入力画面(版20)。見た目・配置は数字の錠の入力画面にそろえる。
-         色のボタンは js/locks.js が data/game.js の LOCK_COLORS から作る(最初のボタン「赤」に選択(フォーカス)が当たる) -->
-    <dialog id="color-lock-dialog" class="lock-dialog">
-      <p id="color-lock-prompt" class="lock-prompt"></p>
-      <div id="color-lock-display" class="color-display" aria-live="polite"></div>
-      <p id="color-lock-note" class="lock-note" aria-live="polite"></p>
-      <div id="color-pad" class="color-pad"></div>
-      <div class="keypad keypad-2">
-        <button id="color-lock-clear">消去</button>
-        <button id="color-lock-submit" class="lock-submit">決定</button>
-      </div>
-      <!-- 数字の錠と同じく、「×」は最後に書いて、開いたときの選択が当たらないようにする -->
-      <button id="color-lock-close" class="lock-close" aria-label="閉じる">×</button>
-    </dialog>
-
-    <!-- デバッグ用パネル。URLに ?debug=1(アーティファクトでは #debug)を付けたときだけ表示 -->
-    <section id="debug-panel" class="debug-panel" hidden>
+<section class="overlay debug" id="debug-screen" hidden>
+  <div class="debug-panel" role="dialog" aria-label="デバッグ">
+    <div class="debug-head">
       <h2>デバッグ</h2>
-      <div id="debug-walls"></div>
-      <div class="debug-row">
-        <span>画面:</span>
-        <button id="debug-start-screen">開始画面を表示</button>
-        <button id="debug-clear-screen">クリア画面を表示</button>
-      </div>
-      <button id="debug-clear">保存データを消去して再読み込み</button>
-    </section>
-  </main>
+      <button id="debug-close" aria-label="閉じる">×</button>
+    </div>
+    <div id="debug-list"></div>
+  </div>
+</section>
 
-  <!-- 読み込む順番に意味がある。後のファイルが、前のファイルで作った定数や関数を使うため。
-       (type="module" は、index.html をファイルのまま開くと Chrome で読み込めないので使わない)
-       1. data/svg.js    絵
-       2. data/items.js  アイテム(絵を使う)
-       3. data/room1.js  1部屋目(絵を使う)
-       4. data/room2.js  台所(絵を使う)
-       5. data/room3.js  洗面所・浴室とトイレ(絵を使う)
-       6. data/game.js   上の5つをまとめて GAME_DATA を作る
-       7. js/ の処理。state.js が最初、main.js が最後(main.js が起動する) -->
-  <script src="data/svg.js"></script>
-  <script src="data/items.js"></script>
-  <script src="data/room1.js"></script>
-  <script src="data/room2.js"></script>
-  <script src="data/room3.js"></script>
-  <script src="data/game.js"></script>
-  <script src="js/state.js"></script>
-  <script src="js/save.js"></script>
-  <script src="js/locks.js"></script>
-  <script src="js/render.js"></script>
-  <script src="js/debug.js"></script>
-  <script src="js/main.js"></script>
+<script>
+const DEBUG = false;
+
+const SAVE_KEY = 'shusaku1-3d-save';
+const SAVE_VERSION = 8;
+
+const ROOMS = {
+  room1:   { name: 'フローリングの部屋', w: 4,   d: 4,   h: 2.5, floor: 'wood', wall: 0xefeae2, start: 'front' },
+  kitchen: { name: '台所',               w: 3.2, d: 3.2, h: 2.4, floor: 'tile', wall: 0xf3f1ea, start: 'kFront' },
+  bath:    { name: '洗面所・浴室',       w: 2.2, d: 2.4, h: 2.3, floor: 'pan',  wall: 0xeef2f3, start: 'wash' },
+  toilet:  { name: 'トイレ',             w: 1.8, d: 1.6, h: 2.3, floor: 'pan',  wall: 0xf1efe9, start: 'toilet' },
+};
+const ROOM = ROOMS.room1;
+
+const CAMERA = { dist: 3.4, eye: 1.35, look: 1.0, fov: 60 };
+
+const FACES = {
+  front:  { room: 'room1',   side: 'front', name: '正面',   left: 'left',   right: 'right', dist: 2.6, shift: 0.45 },
+  right:  { room: 'room1',   side: 'right', name: '右の面', left: 'front',  right: 'back',  dist: 2.6 },
+  back:   { room: 'room1',   side: 'back',  name: '背面',   left: 'right',  right: 'left',  dist: 3.2 },
+  left:   { room: 'room1',   side: 'left',  name: '左の面', left: 'back',   right: 'front', dist: 3.6 },
+  kFront: { room: 'kitchen', side: 'front', name: '正面',   left: 'kLeft',  right: 'kRight', dist: 2.4 },
+  kRight: { room: 'kitchen', side: 'right', name: '右の面', left: 'kFront', right: 'kBack',  dist: 2.4 },
+  kBack:  { room: 'kitchen', side: 'back',  name: '背面',   left: 'kRight', right: 'kLeft',  dist: 2.5 },
+  kLeft:  { room: 'kitchen', side: 'left',  name: '左の面', left: 'kBack',  right: 'kFront', dist: 2.6 },
+  wash:   { room: 'bath',    side: 'front', name: '洗面所', left: 'tub',    right: 'tub',    dist: 1.6, fov: 75, look: 0.6 },
+  tub:    { room: 'bath',    side: 'back',  name: '浴室',   left: 'wash',   right: 'wash',   dist: 1.6, fov: 75, look: 0.6 },
+  toilet: { room: 'toilet',  side: 'front', name: 'トイレ', left: null,     right: null,     dist: 1.5, fov: 75, look: 0.6 },
+};
+const START_FACE = 'front';
+
+const SLOT_COUNT = 4;
+
+const DRIVER_SVG = `
+<svg viewBox="0 0 32 32" aria-hidden="true">
+  <rect x="13.5" y="1" width="5" height="2.5" fill="#a9b2bb"/>
+  <rect x="14.5" y="2" width="3" height="14" fill="#a9b2bb"/>
+  <rect x="11" y="15" width="10" height="16" rx="3" fill="#d9472b"/>
+  <rect x="13" y="18" width="1.5" height="10" fill="#f08a73"/>
+</svg>`;
+const MEMO_COLOR_SVG = `
+<svg viewBox="0 0 32 32" aria-hidden="true">
+  <rect x="5" y="5" width="22" height="22" fill="#ffe680" stroke="#b39a2e" stroke-width="1.5"/>
+  <g stroke="#9a8030" stroke-width="1.5">
+    <line x1="9" y1="12" x2="23" y2="12"/><line x1="9" y1="17" x2="23" y2="17"/><line x1="9" y1="22" x2="18" y2="22"/>
+  </g>
+</svg>`;
+const MEMO_TIME_SVG = `
+<svg viewBox="0 0 32 32" aria-hidden="true">
+  <rect x="6" y="4" width="20" height="26" rx="1.5" fill="#ffffff" stroke="#888" stroke-width="1.5"/>
+  <g fill="#555"><circle cx="11" cy="4" r="1.8"/><circle cx="16" cy="4" r="1.8"/><circle cx="21" cy="4" r="1.8"/></g>
+  <g stroke="#7a9cc6" stroke-width="1.5">
+    <line x1="9" y1="12" x2="23" y2="12"/><line x1="9" y1="17" x2="23" y2="17"/><line x1="9" y1="22" x2="23" y2="22"/>
+  </g>
+</svg>`;
+
+function keySvg(color, extra = '') {
+  return `
+<svg viewBox="0 0 32 32" aria-hidden="true">
+  <circle cx="9" cy="16" r="5.5" fill="none" stroke="${color}" stroke-width="3.5"/>
+  <rect x="14" y="14.5" width="16" height="3" fill="${color}"/>
+  <rect x="22" y="17" width="2.5" height="4" fill="${color}"/>
+  <rect x="27" y="17" width="2.5" height="5.5" fill="${color}"/>${extra}
+</svg>`;
+}
+const BELL_SVG_PART = `
+  <line x1="9" y1="21" x2="9" y2="24" stroke="#c0392b" stroke-width="1.2"/>
+  <circle cx="9" cy="27" r="3.6" fill="#e0b030" stroke="#9a7414" stroke-width="0.8"/>
+  <line x1="7" y1="28" x2="11" y2="28" stroke="#9a7414" stroke-width="0.8"/>`;
+const ICE_KEY_SVG = `
+<svg viewBox="0 0 32 32" aria-hidden="true">
+  <rect x="4" y="5" width="24" height="22" rx="3" fill="#cdeefa" stroke="#7fbfd8" stroke-width="1.5"/>
+  <circle cx="11" cy="16" r="3" fill="none" stroke="#7a838b" stroke-width="1.8"/>
+  <rect x="14" y="15.2" width="10" height="1.6" fill="#7a838b"/>
+  <rect x="20" y="16.5" width="1.5" height="2.5" fill="#7a838b"/>
+  <rect x="22.5" y="16.5" width="1.5" height="3.2" fill="#7a838b"/>
+  <path d="M7 8 L13 8 L7 13 Z" fill="#ffffff" opacity="0.6"/>
+</svg>`;
+const TAP_HANDLE_SVG = `
+<svg viewBox="0 0 32 32" aria-hidden="true">
+  <rect x="13" y="3" width="6" height="26" rx="3" fill="#b9c2ca" stroke="#7d868e" stroke-width="1"/>
+  <rect x="3" y="13" width="26" height="6" rx="3" fill="#b9c2ca" stroke="#7d868e" stroke-width="1"/>
+  <circle cx="16" cy="16" r="5" fill="#d7dde2" stroke="#7d868e" stroke-width="1"/>
+</svg>`;
+
+const ITEMS = {
+  driver:    { name: 'ドライバー', svg: DRIVER_SVG },
+  closetKey: { name: '小さな鍵', svg: keySvg('#c3ccd5') },
+  doorKey:   { name: '金色の鍵', svg: keySvg('#e0b030') },
+  iceKey:     { name: '鍵入りの氷', svg: ICE_KEY_SVG },
+  oldKey:     { name: '古い鍵', svg: keySvg('#a8873a') },
+  bellKey:    { name: '鈴の付いた鍵', svg: keySvg('#c3ccd5', BELL_SVG_PART) },
+  tapHandle:  { name: '蛇口のハンドル', svg: TAP_HANDLE_SVG },
+  padlockKey: { name: '南京錠の鍵', svg: keySvg('#5b6670') },
+  coin:       { name: 'コイン', svg: `
+<svg viewBox="0 0 32 32" aria-hidden="true">
+  <circle cx="16" cy="16" r="11" fill="#e0b030" stroke="#9a7414" stroke-width="1.5"/>
+  <circle cx="16" cy="16" r="7.5" fill="none" stroke="#b88f1e" stroke-width="1"/>
+  <path d="M11 12 Q13 10 15 11" fill="none" stroke="#fff2b0" stroke-width="1.2" stroke-linecap="round"/>
+</svg>` },
+  flashlight: { name: '懐中電灯', svg: `
+<svg viewBox="0 0 32 32" aria-hidden="true">
+  <rect x="2" y="12" width="18" height="8" rx="2" fill="#3a5fa8"/>
+  <rect x="8" y="10" width="4" height="2.5" fill="#ddd"/>
+  <path d="M20 9 L28 6 L28 26 L20 23 Z" fill="#2c4a85"/>
+  <rect x="27.5" y="7" width="2.5" height="18" fill="#fff3b0"/>
+</svg>` },
+  memoColor: { name: 'メモ1', svg: MEMO_COLOR_SVG, memo: 'メモには丸っこい字で「赤 → 青 → 黄」と書いてある。' },
+  memoTime:  { name: 'メモ2', svg: MEMO_TIME_SVG,  memo: 'メモには丸っこい字で「絵の裏を見よ」と書いてある。' },
+};
+
+const BOOK_TITLE = '世界の謎解き全集';
+const VOLUMES = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
+const BOOKMARK_VOLUMES = VOLUMES.filter(v => v <= 9);
+const BOOKMARK_COLORS = [
+  { id: 'red', name: '赤い', hex: 0xd2463c },
+  { id: 'blue', name: '青い', hex: 0x3b6fc4 },
+  { id: 'yellow', name: '黄色い', hex: 0xe8c43a },
+];
+const SHELF_X = -0.95;
+
+function makeBookmarks() {
+  while (true) {
+    const v = [...BOOKMARK_VOLUMES];
+    for (let i = v.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [v[i], v[j]] = [v[j], v[i]];
+    }
+    const b = { red: v[0], blue: v[1], yellow: v[2] };
+    if (!(b.red < b.blue && b.blue < b.yellow)) return b;
+  }
+}
+
+function bookmarkColor(s, v) {
+  return BOOKMARK_COLORS.find(c => s.random.bookmarks[c.id] === v) || null;
+}
+
+function makeBooks() {
+  return VOLUMES.map((v, i) => {
+    const row = Math.floor(i / 5), col = i % 5;
+    return {
+      id: `book${v}`, face: 'left', label: '本', model: 'book',
+      at: [SHELF_X - 0.66 + col * 0.33, row === 0 ? 0.635 : 0.115, 0.17],
+      rules: [
+        { zoom: { model: 'bookCover', arg: s => ({ volume: v, bookmark: bookmarkColor(s, v) }) },
+          message: s => {
+            const c = bookmarkColor(s, v);
+            return `『${BOOK_TITLE}』の第${v}巻だ。` + (c ? `${c.name}栞が挟まっている。` : '');
+          } },
+      ],
+    };
+  });
+}
+
+const LOCK_COLORS = [
+  { id: 'red',    name: '赤', hex: '#d2463c', text: '#fff' },
+  { id: 'blue',   name: '青', hex: '#3b6fc4', text: '#fff' },
+  { id: 'yellow', name: '黄', hex: '#e8c43a', text: '#222' },
+  { id: 'green',  name: '緑', hex: '#4f9a5a', text: '#fff' },
+  { id: 'white',  name: '白', hex: '#f7f5ef', text: '#222' },
+];
+function makePlates() {
+  const ids = LOCK_COLORS.map(c => c.id);
+  for (let i = ids.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [ids[i], ids[j]] = [ids[j], ids[i]];
+  }
+  return ids.slice(0, 4);
+}
+
+function makeMirrorCode() {
+  const d = ['0', '3', '4', '5'];
+  for (let i = d.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [d[i], d[j]] = [d[j], d[i]];
+  }
+  return d.slice(0, 3).join('');
+}
+const SEGMENTS = { 0: 'abcdef', 1: 'bc', 2: 'abdeg', 3: 'abcdg', 4: 'bcfg', 5: 'acdfg', 6: 'acdefg', 7: 'abc', 8: 'abcdefg', 9: 'abcdfg' };
+function makeWallCode() {
+  const isDigit = segs => Object.values(SEGMENTS).some(p => [...p].sort().join('') === [...segs].sort().join(''));
+  const digits = Array.from({ length: 4 }, () => String(Math.floor(Math.random() * 10))).join('');
+  const ink = [...digits].map(d => {
+    const all = [...SEGMENTS[d]];
+    while (true) {
+      const pick = all.filter(() => Math.random() < 0.5);
+      const rest = all.filter(x => !pick.includes(x));
+      if (pick.length && rest.length && !isDigit(pick) && !isDigit(rest)) return pick.join('');
+    }
+  });
+  return { digits, ink };
+}
+
+const MICROWAVE_RULES = [
+  { item: 'iceKey', message: '氷を電子レンジに入れた。', remove: 'iceKey', set: ['iceIn'] },
+  { need: ['iceIn'], unless: ['iceMelted'], message: '電子レンジだ。中に、鍵入りの氷が入っている。' },
+  { message: '電子レンジだ。中は空っぽだ。' },
+];
+const MICROWAVE_LOCK = {
+  need: ['iceIn'], unless: ['iceMelted'],
+  prompt: '温め時間を「分:秒」で入力する。例えば2分05秒なら「2:05」。',
+  pattern: '#:##',
+  answer: '130',
+  fail: 'うまくいかないようだ。',
+  message: '氷が溶けて、中から鍵が出てきた。',
+  gain: 'oldKey', set: ['iceMelted'],
+};
+const ENTRANCE_RULES = [
+  { item: 'bellKey', unless: ['chainOff'], message: '鍵を回した。あとはドアチェーンだ。', remove: 'bellKey', set: ['doorUnlocked'] },
+  { item: 'bellKey', message: '鍵を回すと、玄関の扉が開いた！', remove: 'bellKey', set: ['doorUnlocked', 'entranceOpen'], clear: true },
+  { item: 'padlockKey', unless: ['doorUnlocked'], message: '南京錠を外して、ドアチェーンを外した。あとは鍵だ。', remove: 'padlockKey', set: ['chainOff'] },
+  { item: 'padlockKey', message: '南京錠を外してドアチェーンを外すと、玄関の扉が開いた！', remove: 'padlockKey', set: ['chainOff', 'entranceOpen'], clear: true },
+  { item: 'oldKey', message: '鍵穴に合わないようだ。' },
+  { need: ['doorUnlocked'], message: '玄関の扉だ。鍵は開いたが、ドアチェーンの南京錠が外れない。' },
+  { need: ['chainOff'], message: '玄関の扉だ。ドアチェーンは外したが、鍵がかかっている。' },
+  { message: '玄関の扉だ。鍵がかかっていて、ドアチェーンにも南京錠がかかっている。' },
+];
+
+const OBJECTS = [
+  { id: 'door', face: 'front', label: '扉', model: 'door', at: [0, 0, 0],
+    rules: [
+      { item: 'doorKey', message: '鍵を差し込んで回した。扉が開いた！', remove: 'doorKey', finish: 'kitchen' },
+      { item: 'closetKey', message: '鍵穴に合わないようだ。' },
+      { message: '扉だ。鍵がかかっている。' },
+    ] },
+  { id: 'painting', face: 'front', label: '壁の絵', model: 'painting', at: [0.92, 1.55, 0.03],
+    show: { unless: ['foundSafe'] },
+    rules: [
+      { need: ['drawerOpen'], message: '山と朝日の風景画だ。絵を外して床に置くと、裏の壁に小さな金庫が埋め込まれていた！',
+        set: ['foundSafe'] },
+      { message: '山と朝日の風景画だ。' },
+    ] },
+  { id: 'safe', face: 'front', label: '金庫', model: 'safe', at: [0.92, 1.55, 0],
+    show: { need: ['foundSafe'], unless: ['safeOpen'] },
+    lock: {
+      need: ['foundSafe', 'sawSafeLock'], unless: ['safeOpen'],
+      prompt: '4桁の数字を合わせるようだ。',
+      pattern: '####',
+      answer: '0615',
+      message: '金庫が開いた。中に小さな鍵が入っている！',
+      gain: 'closetKey', set: ['safeOpen'],
+    },
+    rules: [
+      { message: '小さな金庫だ。錠がついている。', set: ['sawSafeLock'] },
+    ] },
+  { id: 'safeOpened', face: 'front', label: '開いた金庫', model: 'safeOpen', at: [0.92, 1.55, 0],
+    show: { need: ['safeOpen'] },
+    rules: [
+      { message: '金庫だ。扉は開いていて、中にはもう何もない。' },
+    ] },
+  { id: 'paintingFloor', face: 'front', label: '床に置いた絵', model: 'painting', at: [0.92, 0.285, 0.09],
+    rot: [-0.2, 0, 0],
+    show: { need: ['foundSafe'] },
+    rules: [
+      { message: '山と朝日の風景画だ。' },
+    ] },
+  { id: 'plant', face: 'front', label: '観葉植物', model: 'plant', at: [1.62, 0, 0.35],
+    rules: [
+      { unless: ['sawPlant', 'gotDriver'], message: '観葉植物だ。鉢の土が少し盛り上がっている。', set: ['sawPlant'] },
+      { unless: ['gotDriver'], message: '鉢の土に何か埋まっている……ドライバーだ！',
+        gain: 'driver', set: ['gotDriver'] },
+      { message: 'ただの観葉植物だ。' },
+    ] },
+  { id: 'closet', face: 'back', label: 'クローゼット', model: 'closet', at: [-0.6, 0, 0],
+    show: { unless: ['closetOpen'] },
+    rules: [
+      { item: 'closetKey', unless: ['boardRemoved'], message: '板が邪魔で扉が開かない。' },
+      { item: 'closetKey', message: '鍵を回すと、クローゼットの扉が開いた。',
+        remove: 'closetKey', set: ['closetOpen'] },
+      { unless: ['boardRemoved'], message: 'クローゼットだ。扉に板が打ち付けてあって開かない。' },
+      { message: 'クローゼットだ。鍵がかかっている。取っ手の下に小さな鍵穴がある。' },
+    ] },
+  { id: 'closetOpened', face: 'back', label: '開いたクローゼット', model: 'closetOpen', at: [-0.6, 0, 0],
+    show: { need: ['closetOpen'] },
+    rules: [
+      { message: 'クローゼットだ。服が何着か掛かっている。' },
+    ] },
+  { id: 'flashlightObj', face: 'back', label: '懐中電灯', model: 'flashlight', at: [-0.75, 0.06, 0.35],
+    show: { need: ['closetOpen'], unless: ['gotFlashlight'] },
+    rules: [
+      { message: '懐中電灯を手に入れた。', gain: 'flashlight', set: ['gotFlashlight'] },
+    ] },
+  { id: 'closetBoard', face: 'back', label: 'クローゼットの板', model: 'board', at: [-0.6, 0.95, 0.63],
+    show: { unless: ['boardRemoved'] },
+    rules: [
+      { item: 'driver', message: 'ドライバーでネジを外し、板を取り外した。',
+        remove: 'driver', set: ['boardRemoved'] },
+      { item: 'closetKey', message: '板が邪魔で扉が開かない。' },
+      { message: '板だ。ネジで留めてあるようだ。' },
+    ] },
+  { id: 'window', face: 'back', label: '窓', model: 'window', at: [0.85, 1.55, 0],
+    rules: [
+      { message: '窓だ。はめ殺しで開かない。' },
+    ] },
+  { id: 'trash', face: 'back', label: 'ゴミ箱', model: 'trash', at: [0.9, 0, 0.35],
+    rules: [
+      { unless: ['sawTrash', 'gotMemoColor'], message: 'ゴミ箱だ。中に、丸めた紙が捨ててある。', set: ['sawTrash'] },
+      { unless: ['gotMemoColor'], message: '丸めた紙を広げるとメモだった。',
+        gain: 'memoColor', set: ['gotMemoColor'] },
+      { message: 'ゴミ箱だ。中はもう空っぽだ。' },
+    ] },
+  { id: 'bookshelf', face: 'left', label: '本棚', model: 'bookshelf', at: [SHELF_X, 0, 0],
+    rules: [
+      { message: '2段の本棚だ。同じ装丁の本が10冊並んでいる。' },
+    ] },
+  ...makeBooks(),
+  { id: 'bed', face: 'left', label: 'ベッド', model: 'bed', at: [0.98, 0, 0],
+    rules: [
+      { item: 'flashlight', unless: ['bedLit'], message: '懐中電灯でベッドの下を照らすと、奥に鍵が落ちていた！',
+        remove: 'flashlight', gain: 'doorKey', set: ['bedLit'] },
+      { unless: ['bedLit'], message: 'ベッドだ。ベッドの下は暗くて奥が見えない。' },
+      { message: 'ベッドだ。ベッドの下にはもう何もない。' },
+    ] },
+  { id: 'clock', face: 'right', label: '壁時計', model: 'clock', at: [-1.2, 1.7, 0],
+    rules: [
+      { message: '壁時計だ。止まっているようだ。' },
+    ] },
+  { id: 'desk', face: 'right', label: '机', model: 'desk', at: [0, 0, 0],
+    lock: {
+      need: ['sawDrawerLock'], unless: ['drawerOpen'],
+      prompt: '3桁の数字を合わせるようだ。',
+      pattern: '###',
+      answer: s => BOOKMARK_COLORS.map(c => s.random.bookmarks[c.id]).join(''),
+      message: '引き出しが開いた。中にメモが入っている。',
+      gain: 'memoTime', set: ['drawerOpen'],
+    },
+    rules: [
+      { need: ['drawerOpen'], message: '机だ。引き出しは開いている。中にはもう何もない。' },
+      { message: '机だ。引き出しに錠がついている。', set: ['sawDrawerLock'] },
+    ] },
+
+  { id: 'kEnteredDoor', face: 'kFront', label: '入ってきた扉', model: 'door', at: [-0.45, 0, 0],
+    rules: [{ message: 'さっきの部屋の扉だ。こちら側からは開かない。' }] },
+  { id: 'toiletDoor', face: 'kFront', label: 'トイレの扉', model: 'door', modelArg: { panel: 0xe6e1d6, frame: 0xb9b2a4 }, at: [0.55, 0, 0],
+    rules: [{ message: 'トイレに入った。', goto: 'toilet' }] },
+  { id: 'accessPanel', face: 'kFront', label: '点検口', model: 'accessPanel', at: [1.3, 1.5, 0],
+    modelArg: s => ({ lid: !s.flags.panelOpen, boxOpen: !!s.flags.panelBoxOpen }),
+    show: { unless: ['panelOpen'] },
+    rules: [
+      { item: 'coin', message: 'コインでねじを回して、点検口のふたを外した。中に小さな箱がある。', remove: 'coin', set: ['panelOpen'] },
+      { message: '点検口だ。四隅がマイナスねじで留めてある。' },
+    ] },
+  { id: 'panelBox', face: 'kFront', label: '点検口の中の箱', model: 'accessPanel', at: [1.3, 1.5, 0],
+    modelArg: s => ({ lid: !s.flags.panelOpen, boxOpen: !!s.flags.panelBoxOpen }),
+    show: { need: ['panelOpen'] },
+    lock: {
+      need: ['sawPanelBoxLock'], unless: ['panelBoxOpen'], prompt: '4桁の数字を合わせるようだ。', pattern: '####',
+      answer: s => s.random.wallCode.digits,
+      message: '箱が開いた。中に南京錠の鍵が入っている！', gain: 'padlockKey', set: ['panelBoxOpen'],
+    },
+    rules: [
+      { need: ['panelBoxOpen'], message: '点検口の中の箱だ。もう何も入っていない。' },
+      { message: '点検口の中の箱だ。錠がついている。', set: ['sawPanelBoxLock'] },
+    ] },
+  { id: 'bathDoor', face: 'kRight', label: '浴室の扉', model: 'door', modelArg: { panel: 0xdcd6c8, frame: 0xb9b2a4 }, at: [-1.12, 0, 0],
+    rules: [{ message: '洗面所に入った。', goto: 'wash' }] },
+  { id: 'entrance', face: 'kRight', label: '玄関の扉', model: 'entrance', at: [-0.1, 0, 0], rules: ENTRANCE_RULES },
+  { id: 'chain', face: 'kRight', label: 'ドアチェーン', model: 'chain', at: [-0.1, 0, 0],
+    show: { unless: ['chainOff'] }, rules: ENTRANCE_RULES },
+  { id: 'shoeBox', face: 'kRight', label: '靴箱', model: 'shoeBox', at: [0.72, 0, 0],
+    rules: [
+      { unless: ['sawShoeBox', 'gotTapHandle'], message: '靴箱だ。靴はなく、工具箱が置いてある。', set: ['sawShoeBox'] },
+      { unless: ['gotTapHandle'], message: '工具箱を開けると、蛇口のハンドルが入っていた。',
+        gain: 'tapHandle', set: ['gotTapHandle'] },
+      { message: '靴箱だ。工具箱のほかには何も入っていない。' },
+    ] },
+  { id: 'fridge', face: 'kBack', label: '冷蔵庫', model: 'fridge', at: [0.95, 0, 0],
+    rules: [{ message: '冷蔵庫だ。冷蔵室の中は空っぽだ。' }] },
+  { id: 'freezer', face: 'kBack', label: '冷凍室', model: 'freezer', at: [0.95, 0, 0.65],
+    rules: [
+      { unless: ['sawFreezer', 'gotIce'], message: '冷凍室だ。製氷皿に、鍵が閉じ込められた氷がある。', set: ['sawFreezer'] },
+      { unless: ['gotIce'], message: '鍵入りの氷を取り出した。',
+        gain: 'iceKey', set: ['gotIce'] },
+      { message: '冷凍室だ。もう何も入っていない。' },
+    ] },
+  { id: 'sink', face: 'kBack', label: '流し台', model: 'sink', at: [-0.45, 0, 0],
+    rules: [{ message: '流し台だ。蛇口をひねると水が出る。' }] },
+  { id: 'sinkCabinet', face: 'kBack', label: '流しの下の戸棚', model: 'sinkDoors', at: [-0.45, 0, 0.6],
+    show: { unless: ['cabinetOpen'] },
+    rules: [
+      { item: 'oldKey', message: '戸棚が開いた。中に皿が重ねてしまってある。', remove: 'oldKey', set: ['cabinetOpen'] },
+      { message: '流しの下の戸棚だ。鍵がかかっている。古そうな鍵穴だ。' },
+    ] },
+  { id: 'sinkCabinetOpen', face: 'kBack', label: '開いた戸棚', model: 'sinkOpen', modelArg: s => s.random.plates, at: [-0.45, 0, 0.6],
+    show: { need: ['cabinetOpen'] },
+    rules: [{ message: '流しの下の戸棚だ。色の違う皿が4枚重ねてある。',
+              zoom: { model: 'platesZoom', arg: s => s.random.plates } }] },
+  { id: 'cupboard', face: 'kLeft', label: '食器棚', model: 'cupboard', modelArg: { open: false }, at: [0.5, 0, 0],
+    show: { unless: ['cupboardOpen'] },
+    lock: {
+      need: ['sawCupboardLock'], unless: ['cupboardOpen'], type: 'color', count: 4,
+      prompt: '『下から順に』と彫ってある。',
+      answer: s => [...s.random.plates].reverse().join(','),
+      message: '食器棚のガラス戸が開いた。中に鍵が入っている！',
+      gain: 'bellKey', set: ['cupboardOpen'],
+    },
+    rules: [{ message: '食器棚だ。ガラス戸に色のボタンの錠がついている。', set: ['sawCupboardLock'] }] },
+  { id: 'cupboardOpened', face: 'kLeft', label: '開いた食器棚', model: 'cupboard', modelArg: { open: true }, at: [0.5, 0, 0],
+    show: { need: ['cupboardOpen'] },
+    rules: [{ message: '食器棚だ。もう何も入っていない。' }] },
+  { id: 'microwave', face: 'kLeft', label: '電子レンジ', model: 'microwave', modelArg: { ice: false }, at: [-0.3, 0, 0],
+    show: { unless: ['iceIn'] }, rules: MICROWAVE_RULES, lock: MICROWAVE_LOCK },
+  { id: 'microwaveIce', face: 'kLeft', label: '電子レンジ', model: 'microwave', modelArg: { ice: true }, at: [-0.3, 0, 0],
+    show: { need: ['iceIn'], unless: ['iceMelted'] }, rules: MICROWAVE_RULES, lock: MICROWAVE_LOCK },
+  { id: 'microwaveDone', face: 'kLeft', label: '電子レンジ', model: 'microwave', modelArg: { ice: false }, at: [-0.3, 0, 0],
+    show: { need: ['iceMelted'] }, rules: MICROWAVE_RULES },
+  { id: 'washDoor', face: 'wash', label: '台所への扉', model: 'door', modelArg: { panel: 0xdcd6c8, frame: 0xb9b2a4 }, at: [-0.55, 0, 0],
+    rules: [{ message: '台所に戻った。', goto: 'kRight' }] },
+  { id: 'washbasin', face: 'wash', label: '洗面台', model: 'washbasin', at: [0.55, 0, 0],
+    rules: [{ message: '洗面台だ。蛇口をひねると水が出る。' }] },
+  { id: 'mirror', face: 'wash', label: '鏡', model: 'mirror', at: [0.55, 1.45, 0],
+    modelArg: s => (s.flags.hotWater ? s.random.mirror : null),
+    rules: [
+      { need: ['hotWater'], message: '鏡に記号が3つ浮かび上がっている。' },
+      { message: '鏡だ。洗面台の上に付いている。' },
+    ] },
+  { id: 'bathtub', face: 'tub', label: '浴槽', model: 'bathtub', at: [0, 0, 0],
+    modelArg: s => ({ hot: !!s.flags.hotWater }),
+    rules: [
+      { item: 'tapHandle', message: 'ハンドルを取り付けて蛇口をひねると、お湯が出てきた。湯気が立ちこめる。', remove: 'tapHandle', set: ['hotWater'] },
+      { need: ['hotWater'], message: '浴槽だ。お湯が出ていて、湯気が立ちこめている。' },
+      { message: '浴槽だ。蛇口のハンドルが外れていて、お湯が出せない。' },
+    ] },
+  { id: 'toiletBackDoor', face: 'toilet', label: '台所への扉', model: 'door', modelArg: { panel: 0xd9b98c, frame: 0xa8865c }, at: [-0.4, 0, 0],
+    darkOk: true,
+    rules: [{ message: '台所に戻った。', goto: 'kFront' }] },
+  { id: 'lightSwitch', face: 'toilet', label: '照明のスイッチ', model: 'lightSwitch', at: [0.28, 1.15, 0], darkOk: true,
+    rules: [{ message: '' }] },
+  { id: 'toiletBowl', face: 'toilet', label: 'トイレ', model: 'toiletBowl', at: [0.6, 0, 0],
+    rules: [{ message: 'トイレだ。' }] },
+  { id: 'smallBox', face: 'toilet', label: '小物入れ', model: 'smallBox', at: [0.6, 0.82, 0.1],
+    modelArg: s => ({ open: !!s.flags.smallBoxOpen }),
+    lock: {
+      need: ['sawSmallBoxLock'], unless: ['smallBoxOpen'], prompt: '3桁の数字を合わせるようだ。', pattern: '###',
+      answer: s => s.random.mirror,
+      message: '小物入れが開いた。中にコインが入っている！', gain: 'coin', set: ['smallBoxOpen'],
+    },
+    rules: [
+      { need: ['smallBoxOpen'], message: '小物入れだ。もう何も入っていない。' },
+      { message: '小物入れだ。錠がついている。', set: ['sawSmallBoxLock'] },
+    ] },
+  { id: 'wallCode', face: 'toilet', label: '壁の線', model: 'wallCode', at: [0.6, 1.5, 0], darkOk: true,
+    modelArg: s => ({ code: s.random.wallCode, dark: !!s.lightOff }),
+    rules: [
+      { need: ['_dark'], message: '暗がりに光る線が浮かび上がっている。' },
+      { message: '壁に何か書いてある。' },
+    ] },
+  { id: 'gratinBox', face: 'kBack', label: '冷凍グラタンの空き箱', model: 'gratinBox', at: [0.05, 0.86, 0.35],
+    rules: [{ message: '冷凍グラタンの空き箱だ。『温め 600W 3分 ／ 解凍 600W 1分30秒』と書いてある。' }] },
+];
+
+const NOTHING_HAPPENS = '何も起きない。';
+
+const START_SCENE_SVG = `
+<svg viewBox="0 0 240 180" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+  <rect width="240" height="150" fill="#2e3540"/>
+  <rect y="150" width="240" height="30" fill="#22272f"/>
+  <ellipse cx="120" cy="158" rx="70" ry="9" fill="#3a4350"/>
+  <rect x="80" y="20" width="80" height="130" fill="#1f2731"/>
+  <rect x="84" y="24" width="72" height="126" fill="#3b4a5c"/>
+  <rect x="112" y="40" width="16" height="22" fill="#1c242d" stroke="#9aa7b4" stroke-width="1.5"/>
+  <circle cx="146" cy="92" r="4.5" fill="#c3ccd5"/>
+  <circle cx="146" cy="104" r="2.2" fill="#141a20"/>
+  <rect x="145.2" y="104" width="1.6" height="4" fill="#141a20"/>
+  <rect x="160" y="62" width="6" height="12" rx="1" fill="#8a949e"/>
+  <rect x="139" y="62" width="6" height="12" rx="1" fill="#8a949e"/>
+  <path d="M142 66 Q152 86 163 66" fill="none" stroke="#b8c0c8" stroke-width="2.4" stroke-dasharray="3 1.6"/>
+  <path d="M148.5 82 v-3.5 a3.5 3.5 0 0 1 7 0 v3.5" fill="none" stroke="#9aa3ab" stroke-width="1.8"/>
+  <rect x="146" y="81" width="12" height="10" rx="1.5" fill="#c9a447"/>
+  <circle cx="152" cy="85.5" r="1.3" fill="#5a4a2a"/>
+</svg>`;
+</script>
+
+<script type="module">
+{
+  const roomBox = document.getElementById('room');
+  const hitLayer = document.getElementById('hit-layer');
+  const messageBox = document.getElementById('message');
+  const slotsBox = document.getElementById('slots');
+  const menuBox = document.getElementById('menu');
+  const menuBtn = document.getElementById('menu-btn');
+  const titleScreen = document.getElementById('title-screen');
+  const dividerScreen = document.getElementById('divider-screen');
+  const btnContinue = document.getElementById('btn-continue');
+  const btnDivider = document.getElementById('btn-divider');
+  document.getElementById('title-pic').innerHTML = START_SCENE_SVG;
+
+  let THREE = null;
+  try {
+    THREE = await import('three');
+  } catch (e) {
+    console.error(e);
+    roomBox.insertAdjacentHTML('beforeend',
+      '<div id="room-error">3Dの絵を描く three.js を読み込めませんでした。<br>通信の状態を確かめて、再読み込みしてください。</div>');
+  }
+
+  let state = null;
+  let selected = null;
+  let flashItem = null;
+  let dividerDebug = false;
+  let zoomView = null;
+
+  function newState() {
+    return { version: SAVE_VERSION, face: START_FACE, items: [], flags: {},
+             random: { bookmarks: makeBookmarks(), plates: makePlates(), mirror: makeMirrorCode(), wallCode: makeWallCode() } };
+  }
+
+  function flagsOk(cond) {
+    if (!cond) return true;
+    const has = f => (f === '_dark' ? !!state.lightOff : state.flags[f]);
+    if (cond.need && !cond.need.every(has)) return false;
+    if (cond.unless && cond.unless.some(has)) return false;
+    return true;
+  }
+  const isShown = obj => flagsOk(obj.show);
+
+  const valueOf = v => (typeof v === 'function' ? v(state) : v);
+
+  function onObjectClick(obj) {
+    if (obj.id === 'lightSwitch') { toggleLight(); return; }
+    if (state.lightOff && FACES[obj.face].room === 'toilet' && !obj.darkOk) {
+      setMessage('暗くて見えない。');
+      return;
+    }
+    const rule = obj.rules.find(r => (r.item || null) === selected && flagsOk(r));
+    if (obj.lock && !selected && flagsOk(obj.lock)) {
+      if (rule && rule.message) setMessage(valueOf(rule.message));
+      openLock(obj.lock);
+      return;
+    }
+    if (!rule) {
+      setMessage(NOTHING_HAPPENS);
+      return;
+    }
+    applyResult(rule);
+  }
+
+  function toggleLight() {
+    state.lightOff = !state.lightOff;
+    setMessage(state.lightOff ? 'スイッチだ。押すと、明かりが消えた。' : 'スイッチだ。押すと、明かりが点いた。');
+    renderAll(false);
+  }
+
+  function applyResult(rule) {
+    if (rule.message) setMessage(valueOf(rule.message));
+    if (rule.set) rule.set.forEach(f => { state.flags[f] = true; });
+    if (rule.remove) {
+      state.items = state.items.filter(id => id !== rule.remove);
+      if (selected === rule.remove) selected = null;
+    }
+    if (rule.gain && !state.items.includes(rule.gain)) {
+      state.items.push(rule.gain);
+      flashItem = rule.gain;
+    }
+    if (rule.finish) {
+      setMessage('');
+      state.items = state.items.filter(id => !ITEMS[id].memo);
+      selected = null;
+      state.face = ROOMS[rule.finish].start;
+    }
+    if (rule.zoom) zoomView = { model: rule.zoom.model, arg: valueOf(rule.zoom.arg) };
+    if (rule.goto) {
+      state.face = rule.goto;
+      state.lightOff = false;
+    }
+    save();
+    renderAll(!!(rule.zoom || rule.goto));
+    if (rule.clear) showClear();
+    if (rule.finish) showDivider(false);
+  }
+
+  function goFace(face) {
+    zoomView = null;
+    state.face = face;
+    save();
+    renderAll(true);
+  }
+
+  function save() {
+    try {
+      localStorage.setItem(SAVE_KEY, JSON.stringify(state, (k, v) => (k === 'lightOff' ? undefined : v)));
+    } catch (e) {  }
+  }
+  function load() {
+    try {
+      const data = JSON.parse(localStorage.getItem(SAVE_KEY));
+      if (!data || data.version !== SAVE_VERSION || !FACES[data.face] || !Array.isArray(data.items)
+          || data.items.some(id => !ITEMS[id]) || typeof data.flags !== 'object'
+          || !data.random || !data.random.bookmarks || !data.random.plates || !data.random.mirror || !data.random.wallCode) {
+        if (data) clearSave();
+        return null;
+      }
+      return data;
+    } catch (e) {
+      clearSave();
+      return null;
+    }
+  }
+  function clearSave() {
+    try { localStorage.removeItem(SAVE_KEY); } catch (e) {  }
+  }
+
+  let renderer = null, camera = null;
+  const scenes = {};
+  let zoomScene = null, zoomCamera = null, zoomHolder = null;
+  const wallGroups = {};
+  const objGroups = {};
+
+  const mat = (color, roughness = 0.8, metalness = 0) =>
+    new THREE.MeshStandardMaterial({ color, roughness, metalness });
+
+  function canvasTexture(w, h, draw) {
+    const c = document.createElement('canvas');
+    c.width = w; c.height = h;
+    draw(c.getContext('2d'), w, h);
+    const t = new THREE.CanvasTexture(c);
+    t.colorSpace = THREE.SRGBColorSpace;
+    return t;
+  }
+  const box = (w, h, d, material) => new THREE.Mesh(new THREE.BoxGeometry(w, h, d), material);
+
+  const MODELS = {
+    door({ panel: panelColor = 0x9c7350, frame: frameColor = 0x6e5038 } = {}) {
+      const g = new THREE.Group();
+      const frame = box(1.0, 2.08, 0.05, mat(frameColor)); frame.position.set(0, 1.04, 0);
+      const panel = box(0.88, 2.0, 0.06, mat(panelColor, 0.6)); panel.position.set(0, 1.0, 0.02);
+      const knob = new THREE.Mesh(new THREE.SphereGeometry(0.04, 16, 12), mat(0xd8c27a, 0.3, 0.6));
+      knob.position.set(0.34, 1.0, 0.08);
+      const keyhole = box(0.014, 0.03, 0.01, mat(0x2a2420)); keyhole.position.set(0.34, 0.92, 0.055);
+      g.add(frame, panel, knob, keyhole);
+      return g;
+    },
+    table() {
+      const g = new THREE.Group();
+      const wood = mat(0xa0703f, 0.6);
+      const top = box(0.8, 0.04, 0.6, wood); top.position.set(0, 0.72, 0.3);
+      g.add(top);
+      for (const x of [-0.36, 0.36]) for (const z of [0.05, 0.55]) {
+        const leg = box(0.04, 0.7, 0.04, mat(0x7d5530, 0.6)); leg.position.set(x, 0.35, z); g.add(leg);
+      }
+      return g;
+    },
+    gratinBox() {
+      const g = new THREE.Group();
+      const label = canvasTexture(256, 160, (c, w, h) => {
+        c.fillStyle = '#c8453a'; c.fillRect(0, 0, w, h);
+        c.fillStyle = '#f6efe0'; c.beginPath(); c.ellipse(w / 2, h * 0.55, 90, 40, 0, 0, Math.PI * 2); c.fill();
+        c.fillStyle = '#e9b14f'; c.beginPath(); c.ellipse(w / 2, h * 0.52, 72, 28, 0, 0, Math.PI * 2); c.fill();
+      });
+      const red = mat(0xc8453a, 0.6);
+      const b = new THREE.Mesh(new THREE.BoxGeometry(0.28, 0.06, 0.18),
+        [red, red, new THREE.MeshStandardMaterial({ map: label, roughness: 0.6 }), red, red, red]);
+      b.position.y = 0.03;
+      g.add(b);
+      return g;
+    },
+    accessPanel({ lid, boxOpen }) {
+      const g = new THREE.Group();
+      if (lid) {
+        const cover = box(0.32, 0.32, 0.012, mat(0xdfe3e5, 0.6)); cover.position.z = 0.006;
+        g.add(cover);
+        for (const x of [-0.13, 0.13]) for (const y of [-0.13, 0.13]) {
+          const sc = new THREE.Mesh(new THREE.CylinderGeometry(0.012, 0.012, 0.006, 12), mat(0x9aa3ab, 0.4, 0.6));
+          sc.rotation.x = Math.PI / 2; sc.position.set(x, y, 0.015); g.add(sc);
+        }
+        return g;
+      }
+      const hole = box(0.3, 0.3, 0.004, mat(0x2a2e32, 0.9)); hole.position.z = 0.003;
+      const rim = mat(0x8e98a0, 0.5);
+      for (const [x, y, w, h] of [[0, 0.155, 0.32, 0.012], [0, -0.155, 0.32, 0.012], [-0.155, 0, 0.012, 0.32], [0.155, 0, 0.012, 0.32]]) {
+        const p = box(w, h, 0.01, rim); p.position.set(x, y, 0.006); g.add(p);
+      }
+      const wood = mat(0xb08a5e, 0.6);
+      const body = box(0.16, 0.1, 0.1, wood); body.position.set(0, -0.08, 0.05);
+      g.add(hole, body);
+      if (boxOpen) {
+        const lidOpen = box(0.16, 0.01, 0.1, mat(0xc49a6a, 0.6)); lidOpen.position.set(0, -0.01, 0.0); lidOpen.rotation.x = -1.2;
+        g.add(lidOpen);
+      } else {
+        const top = box(0.16, 0.012, 0.1, mat(0xc49a6a, 0.6)); top.position.set(0, -0.024, 0.05);
+        const dial = box(0.1, 0.035, 0.006, mat(0x2b2f33, 0.5)); dial.position.set(0, -0.08, 0.103);
+        g.add(top, dial);
+      }
+      return g;
+    },
+    washbasin() {
+      const g = new THREE.Group();
+      const cab = box(0.6, 0.7, 0.45, mat(0xf1efe8, 0.6)); cab.position.set(0, 0.35, 0.225);
+      const bowl = box(0.62, 0.12, 0.5, mat(0xfbfbf8, 0.25)); bowl.position.set(0, 0.76, 0.25);
+      const sink = box(0.42, 0.01, 0.3, mat(0xdfe6ea, 0.2)); sink.position.set(0, 0.825, 0.27);
+      const tap = new THREE.Mesh(new THREE.CylinderGeometry(0.015, 0.015, 0.14, 12), mat(0xb9c2ca, 0.25, 0.8));
+      tap.position.set(0, 0.88, 0.07);
+      const line = box(0.006, 0.6, 0.005, mat(0xa9a397)); line.position.set(0, 0.35, 0.452);
+      g.add(cab, bowl, sink, tap, line);
+      return g;
+    },
+    mirror(digits) {
+      const g = new THREE.Group();
+      const frame = box(0.52, 0.42, 0.02, mat(0xc9d1d7, 0.4, 0.4)); frame.position.z = 0.01;
+      const face = canvasTexture(256, 200, (c, w, h) => {
+        c.fillStyle = '#cfe3ec'; c.fillRect(0, 0, w, h);
+        if (!digits) {
+          c.fillStyle = 'rgba(255,255,255,.5)'; c.beginPath(); c.moveTo(20, 20); c.lineTo(80, 20); c.lineTo(20, 90); c.fill();
+          return;
+        }
+        c.fillStyle = 'rgba(255,255,255,.65)'; c.fillRect(0, 0, w, h);
+        c.strokeStyle = '#7f95a3'; c.lineWidth = 7; c.lineJoin = 'round'; c.lineCap = 'round';
+        [...digits].forEach((d, i) => {
+          const cx = 50 + i * 78, cy = h / 2, r = 28;
+          const pt = (deg, dd) => [cx + dd * Math.cos(deg * Math.PI / 180), cy + dd * Math.sin(deg * Math.PI / 180)];
+          c.beginPath();
+          if (d === '0') c.arc(cx, cy, r, 0, Math.PI * 2);
+          else {
+            const pts = d === '3' ? [-90, 30, 150].map(a => pt(a, r))
+              : d === '4' ? [-90, 0, 90, 180].map(a => pt(a, r))
+              : Array.from({ length: 10 }, (_, k) => pt(-90 + k * 36, k % 2 ? r * 0.45 : r));
+            pts.forEach(([x, y], k) => (k ? c.lineTo(x, y) : c.moveTo(x, y)));
+            c.closePath();
+          }
+          c.stroke();
+        });
+      });
+      const glass = new THREE.Mesh(new THREE.PlaneGeometry(0.46, 0.36), new THREE.MeshStandardMaterial({ map: face, roughness: 0.15 }));
+      glass.position.z = 0.021;
+      g.add(frame, glass);
+      return g;
+    },
+    bathtub({ hot }) {
+      const g = new THREE.Group();
+      const white = mat(0xf4f6f6, 0.3);
+      const W = 1.4, D = 0.75, H = 0.55;
+      for (const [x, z, w, d] of [[0, 0.04, W, 0.08], [0, D - 0.04, W, 0.08], [-W / 2 + 0.04, D / 2, 0.08, D], [W / 2 - 0.04, D / 2, 0.08, D]]) {
+        const p = box(w, H, d, white); p.position.set(x, H / 2, z); g.add(p);
+      }
+      const bottom = box(W - 0.16, 0.05, D - 0.16, white); bottom.position.set(0, 0.1, D / 2);
+      const spout = box(0.04, 0.04, 0.16, mat(0xb9c2ca, 0.25, 0.8)); spout.position.set(0.3, 0.8, 0.08);
+      const stem = box(0.05, 0.05, 0.03, mat(0x8e98a0, 0.3, 0.7)); stem.position.set(0.3, 0.92, 0.02);
+      g.add(bottom, spout, stem);
+      if (hot) {
+        const water = box(W - 0.18, 0.02, D - 0.18, new THREE.MeshStandardMaterial({ color: 0x9fd2e6, roughness: 0.1, transparent: true, opacity: 0.8 }));
+        water.position.set(0, 0.42, D / 2);
+        g.add(water);
+        const fog = canvasTexture(128, 128, (c, w, h) => {
+          const grad = c.createRadialGradient(w / 2, h / 2, 0, w / 2, h / 2, w / 2);
+          grad.addColorStop(0, 'rgba(255,255,255,0.55)');
+          grad.addColorStop(0.5, 'rgba(255,255,255,0.22)');
+          grad.addColorStop(1, 'rgba(255,255,255,0)');
+          c.fillStyle = grad; c.fillRect(0, 0, w, h);
+        });
+        const fogMat = new THREE.SpriteMaterial({ map: fog, transparent: true, depthWrite: false });
+        [[-0.4, 0.6, 0.7], [0, 0.65, 0.8], [0.4, 0.6, 0.7], [-0.2, 0.95, 0.9], [0.25, 1.0, 0.85], [0, 1.3, 1.0], [-0.35, 1.25, 0.7], [0.4, 1.35, 0.7]]
+          .forEach(([x, y, size]) => {
+            const puff = new THREE.Sprite(fogMat);
+            puff.position.set(x, y, D / 2); puff.scale.set(size, size, 1);
+            g.add(puff);
+          });
+      }
+      return g;
+    },
+    lightSwitch() {
+      const g = new THREE.Group();
+      const plate = box(0.08, 0.12, 0.01, mat(0xfbfbf8, 0.5)); plate.position.z = 0.005;
+      const btn = box(0.035, 0.06, 0.008, mat(0xeef0ee, 0.5)); btn.position.z = 0.014;
+      const led = new THREE.Mesh(new THREE.CircleGeometry(0.005, 12), new THREE.MeshBasicMaterial({ color: 0x7fdf7f }));
+      led.position.set(0, 0.018, 0.0185);
+      g.add(plate, btn, led);
+      return g;
+    },
+    toiletBowl() {
+      const g = new THREE.Group();
+      const white = mat(0xfbfbf8, 0.25);
+      const tank = box(0.42, 0.4, 0.2, white); tank.position.set(0, 0.6, 0.12);
+      const tankLid = box(0.44, 0.03, 0.22, mat(0xeef0ee, 0.3)); tankLid.position.set(0, 0.815, 0.12);
+      const base = new THREE.Mesh(new THREE.CylinderGeometry(0.16, 0.13, 0.38, 24), white); base.position.set(0, 0.19, 0.42);
+      const seat = new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.2, 0.04, 32), mat(0xeef0ee, 0.3));
+      seat.scale.set(1, 1, 1.25); seat.position.set(0, 0.4, 0.45);
+      g.add(tank, tankLid, base, seat);
+      return g;
+    },
+    smallBox({ open }) {
+      const g = new THREE.Group();
+      const wood = mat(0xb08a5e, 0.6);
+      const body = box(0.26, 0.09, 0.14, wood); body.position.set(0, 0.045, 0);
+      g.add(body);
+      if (open) {
+        const lid = box(0.26, 0.012, 0.14, mat(0xc49a6a, 0.6)); lid.position.set(0, 0.12, -0.06); lid.rotation.x = -1.3;
+        const inside = box(0.22, 0.004, 0.1, mat(0x5a3d22)); inside.position.set(0, 0.092, 0);
+        g.add(lid, inside);
+      } else {
+        const lid = box(0.27, 0.025, 0.15, mat(0xc49a6a, 0.6)); lid.position.set(0, 0.1, 0);
+        const dial = box(0.12, 0.04, 0.006, mat(0x2b2f33, 0.5)); dial.position.set(0, 0.045, 0.073);
+        g.add(lid, dial);
+      }
+      return g;
+    },
+    wallCode({ code, dark }) {
+      const segs = { a: [3, 2, 13, 2], b: [14, 3, 14, 13], c: [14, 15, 14, 25], d: [3, 26, 13, 26], e: [2, 15, 2, 25], f: [2, 3, 2, 13], g: [3, 14, 13, 14] };
+      const tex = canvasTexture(400, 144, (c, w, h) => {
+        c.clearRect(0, 0, w, h);
+        c.strokeStyle = dark ? '#c8ff8a' : '#6d6f70';
+        c.lineWidth = 9; c.lineCap = 'round';
+        const sx = 4, sy = 4.4;
+        [...code.digits].forEach((d, i) => {
+          const ink = code.ink[i];
+          const shown = dark ? [...SEGMENTS[d]].filter(x => !ink.includes(x)) : [...ink];
+          for (const k of shown) {
+            const [x1, y1, x2, y2] = segs[k];
+            const ox = 24 + i * 92;
+            c.beginPath(); c.moveTo(ox + x1 * sx, 6 + y1 * sy); c.lineTo(ox + x2 * sx, 6 + y2 * sy); c.stroke();
+          }
+        });
+      });
+      const m = dark
+        ? new THREE.MeshBasicMaterial({ map: tex, transparent: true })
+        : new THREE.MeshStandardMaterial({ map: tex, transparent: true, roughness: 0.9 });
+      const plane = new THREE.Mesh(new THREE.PlaneGeometry(0.5, 0.18), m);
+      plane.position.z = 0.004;
+      const g = new THREE.Group();
+      g.add(plane);
+      return g;
+    },
+    entrance() {
+      const g = new THREE.Group();
+      const frame = box(1.04, 2.1, 0.05, mat(0x1f2731, 0.5)); frame.position.set(0, 1.05, 0);
+      const panel = box(0.92, 2.02, 0.06, mat(0x3b4a5c, 0.4, 0.4)); panel.position.set(0, 1.01, 0.02);
+      const peep = new THREE.Mesh(new THREE.CylinderGeometry(0.015, 0.015, 0.02, 16), mat(0x9aa7b4, 0.3, 0.7));
+      peep.rotation.x = Math.PI / 2; peep.position.set(0, 1.55, 0.055);
+      const lever = box(0.14, 0.025, 0.03, mat(0xc3ccd5, 0.3, 0.8)); lever.position.set(-0.3, 1.0, 0.075);
+      const keyhole = box(0.016, 0.035, 0.01, mat(0x141a20)); keyhole.position.set(-0.36, 0.9, 0.055);
+      g.add(frame, panel, peep, lever, keyhole);
+      return g;
+    },
+    chain() {
+      const g = new THREE.Group();
+      const steel = mat(0xb8c0c8, 0.3, 0.8);
+      const plate1 = box(0.04, 0.09, 0.02, steel); plate1.position.set(-0.5, 1.45, 0.07);
+      const plate2 = box(0.04, 0.09, 0.02, steel); plate2.position.set(-0.28, 1.45, 0.07);
+      g.add(plate1, plate2);
+      for (let i = 0; i < 6; i++) {
+        const link = new THREE.Mesh(new THREE.TorusGeometry(0.014, 0.004, 6, 12), steel);
+        link.position.set(-0.47 + i * 0.033, 1.42 - Math.sin(i / 5 * Math.PI) * 0.03, 0.08);
+        link.rotation.y = i % 2 ? Math.PI / 2 : 0;
+        g.add(link);
+      }
+      const lock = box(0.05, 0.05, 0.02, mat(0xd9a520, 0.35, 0.6)); lock.position.set(-0.39, 1.35, 0.085);
+      const shackle = new THREE.Mesh(new THREE.TorusGeometry(0.016, 0.004, 6, 12, Math.PI), mat(0x8a7a3a, 0.4, 0.6));
+      shackle.position.set(-0.39, 1.375, 0.085);
+      g.add(lock, shackle);
+      return g;
+    },
+    shoeBox() {
+      const g = new THREE.Group();
+      const body = box(0.5, 0.85, 0.35, mat(0xece5d8, 0.7)); body.position.set(0, 0.425, 0.175);
+      const top = box(0.54, 0.04, 0.38, mat(0xbfa47e, 0.6)); top.position.set(0, 0.87, 0.19);
+      const gap = box(0.006, 0.8, 0.005, mat(0x9c8f7a)); gap.position.set(0, 0.42, 0.353);
+      g.add(body, top, gap);
+      for (const x of [-0.03, 0.03]) {
+        const h = box(0.015, 0.1, 0.02, mat(0x8a7d68, 0.5)); h.position.set(x, 0.55, 0.36); g.add(h);
+      }
+      return g;
+    },
+    fridge() {
+      const g = new THREE.Group();
+      const white = mat(0xe3e7ea, 0.4, 0.1);
+      const body = box(0.65, 1.7, 0.63, white); body.position.set(0, 0.85, 0.315);
+      const door = box(0.62, 1.08, 0.02, mat(0xf4f6f8, 0.35, 0.1)); door.position.set(0, 1.14, 0.64);
+      const handle = box(0.025, 0.35, 0.03, mat(0x9aa3ab, 0.3, 0.6)); handle.position.set(0.25, 1.15, 0.665);
+      g.add(body, door, handle);
+      return g;
+    },
+    freezer() {
+      const g = new THREE.Group();
+      const front = box(0.62, 0.5, 0.02, mat(0xf4f6f8, 0.35, 0.1)); front.position.set(0, 0.3, 0.01);
+      const handle = box(0.3, 0.025, 0.03, mat(0x9aa3ab, 0.3, 0.6)); handle.position.set(0, 0.5, 0.035);
+      g.add(front, handle);
+      return g;
+    },
+    sink() {
+      const g = new THREE.Group();
+      const wood = mat(0xd8c3a0, 0.7);
+      const back = box(1.4, 0.82, 0.02, wood); back.position.set(0, 0.41, 0.01);
+      const bottom = box(1.4, 0.04, 0.58, wood); bottom.position.set(0, 0.02, 0.29);
+      g.add(back, bottom);
+      for (const x of [-0.69, 0.69]) { const sd = box(0.02, 0.82, 0.58, wood); sd.position.set(x, 0.41, 0.29); g.add(sd); }
+      const top = box(1.42, 0.04, 0.62, mat(0xc9ccce, 0.25, 0.7)); top.position.set(0, 0.84, 0.31);
+      const basin = box(0.6, 0.012, 0.4, mat(0x6f7477, 0.3, 0.7)); basin.position.set(0, 0.865, 0.3);
+      const pipe = new THREE.Mesh(new THREE.CylinderGeometry(0.015, 0.015, 0.3, 12), mat(0xa9b2bb, 0.25, 0.8));
+      pipe.position.set(0.2, 1.0, 0.1);
+      const spout = box(0.025, 0.025, 0.2, mat(0xa9b2bb, 0.25, 0.8)); spout.position.set(0.2, 1.14, 0.19);
+      g.add(top, basin, pipe, spout);
+      return g;
+    },
+    sinkDoors() {
+      const g = new THREE.Group();
+      const wood = mat(0xd2bb94, 0.65);
+      for (const x of [-0.35, 0.35]) {
+        const d = box(0.68, 0.74, 0.02, wood); d.position.set(x, 0.41, 0.01); g.add(d);
+        const h = box(0.02, 0.12, 0.025, mat(0x8a6f4a, 0.5)); h.position.set(x * 0.12, 0.6, 0.03); g.add(h);
+      }
+      const keyhole = box(0.02, 0.04, 0.008, mat(0x4a3a26)); keyhole.position.set(0.12, 0.48, 0.024);
+      g.add(keyhole);
+      return g;
+    },
+    sinkOpen(plates) {
+      const g = new THREE.Group();
+      const inside = box(1.36, 0.78, 0.01, mat(0x3a2f24, 0.9)); inside.position.set(0, 0.41, -0.57);
+      const floor = box(1.36, 0.01, 0.56, mat(0x4a3d2e, 0.9)); floor.position.set(0, 0.045, -0.29);
+      g.add(inside, floor);
+      const wood = mat(0xd2bb94, 0.65);
+      const back = box(0.68, 0.74, 0.02, wood); back.position.set(0.35, 0.41, -0.015);
+      const front = box(0.68, 0.74, 0.02, wood); front.position.set(0.35, 0.41, 0.01);
+      g.add(back, front);
+      const hex = id => LOCK_COLORS.find(c => c.id === id).hex;
+      (plates || []).slice().reverse().forEach((id, k) => {
+        const plate = new THREE.Mesh(new THREE.CylinderGeometry(0.13, 0.1, 0.022, 32), mat(hex(id), 0.45));
+        plate.position.set(-0.35, 0.062 + k * 0.026, -0.22);
+        g.add(plate);
+      });
+      return g;
+    },
+    cupboard({ open }) {
+      const g = new THREE.Group();
+      const wood = mat(0x8a6340, 0.7);
+      const lower = box(0.9, 0.8, 0.4, wood); lower.position.set(0, 0.4, 0.2);
+      const counter = box(0.92, 0.03, 0.42, mat(0x7a5532, 0.6)); counter.position.set(0, 0.815, 0.21);
+      const back = box(0.9, 1.0, 0.02, mat(0x5e3f22, 0.8)); back.position.set(0, 1.33, 0.02);
+      const top = box(0.9, 0.04, 0.35, wood); top.position.set(0, 1.85, 0.175);
+      const shelf = box(0.86, 0.02, 0.32, wood); shelf.position.set(0, 1.33, 0.17);
+      g.add(lower, counter, back, top, shelf);
+      for (const x of [-0.44, 0.44]) { const sd = box(0.02, 1.0, 0.35, wood); sd.position.set(x, 1.33, 0.175); g.add(sd); }
+      for (const x of [-0.22, 0.22]) {
+        const d = box(0.43, 0.74, 0.02, mat(0xa07a50, 0.6)); d.position.set(x, 0.4, 0.41); g.add(d);
+      }
+      if (!open) {
+        const dish = mat(0xe8eef0, 0.4);
+        for (const x of [-0.28, -0.12, 0.2]) {
+          const cup = new THREE.Mesh(new THREE.CylinderGeometry(0.035, 0.03, 0.1, 16), dish);
+          cup.position.set(x, 1.39, 0.17); g.add(cup);
+        }
+        const glassMat = new THREE.MeshStandardMaterial({ color: 0xc9dde3, roughness: 0.1, transparent: true, opacity: 0.35 });
+        for (const x of [-0.22, 0.22]) {
+          const gl = box(0.42, 0.96, 0.01, glassMat); gl.position.set(x, 1.33, 0.35); g.add(gl);
+        }
+        const plate = box(0.2, 0.05, 0.012, mat(0x4a3a26, 0.5)); plate.position.set(0.22, 0.98, 0.36); g.add(plate);
+        LOCK_COLORS.forEach((c, i) => {
+          const btn = new THREE.Mesh(new THREE.CylinderGeometry(0.012, 0.012, 0.008, 12), mat(c.hex, 0.4));
+          btn.rotation.x = Math.PI / 2; btn.position.set(0.14 + i * 0.04, 0.98, 0.37); g.add(btn);
+        });
+      } else {
+        const glassMat = new THREE.MeshStandardMaterial({ color: 0xc9dde3, roughness: 0.1, transparent: true, opacity: 0.35 });
+        for (const sx of [-1, 1]) {
+          const hinge = new THREE.Group(); hinge.position.set(sx * 0.44, 1.33, 0.35);
+          const gl = box(0.42, 0.96, 0.01, glassMat); gl.position.x = -sx * 0.21;
+          hinge.add(gl); hinge.rotation.y = sx * 1.7; g.add(hinge);
+        }
+      }
+      return g;
+    },
+    microwave({ ice }) {
+      const g = new THREE.Group();
+      const stand = box(0.6, 0.6, 0.45, mat(0xb08a5e, 0.65)); stand.position.set(0, 0.3, 0.225);
+      const body = box(0.5, 0.3, 0.38, mat(0xececec, 0.4)); body.position.set(0, 0.75, 0.2);
+      const win = box(0.3, 0.2, 0.01, mat(0x2b2f33, 0.2)); win.position.set(-0.07, 0.75, 0.395);
+      const panel = box(0.1, 0.22, 0.01, mat(0xb9bcbf, 0.4)); panel.position.set(0.17, 0.75, 0.395);
+      g.add(stand, body, win, panel);
+      if (ice) {
+        const iceMat = new THREE.MeshStandardMaterial({ color: 0xcdeefa, roughness: 0.15, emissive: 0x18343c });
+        const block = box(0.12, 0.09, 0.012, iceMat); block.position.set(-0.07, 0.72, 0.402);
+        const key = box(0.07, 0.012, 0.005, mat(0x7a838b, 0.4, 0.6)); key.position.set(-0.07, 0.72, 0.41);
+        g.add(block, key);
+      }
+      return g;
+    },
+    painting() {
+      const g = new THREE.Group();
+      const frame = box(0.72, 0.58, 0.04, mat(0xb08a2e, 0.45, 0.3));
+      const art = canvasTexture(256, 200, (c, w, h) => {
+        const sky = c.createLinearGradient(0, 0, 0, h);
+        sky.addColorStop(0, '#bfe0f0'); sky.addColorStop(0.5, '#f8e2c0'); sky.addColorStop(1, '#f8d9b0');
+        c.fillStyle = sky; c.fillRect(0, 0, w, h);
+        c.fillStyle = '#f39a3c'; c.beginPath(); c.arc(w * 0.82, h * 0.66, 26, 0, Math.PI * 2); c.fill();
+        c.fillStyle = '#6f9a5a'; c.beginPath();
+        c.moveTo(0, h); c.lineTo(w * 0.34, h * 0.32); c.lineTo(w * 0.58, h * 0.72);
+        c.lineTo(w * 0.74, h * 0.55); c.lineTo(w, h); c.fill();
+      });
+      const picture = new THREE.Mesh(new THREE.PlaneGeometry(0.62, 0.48),
+        new THREE.MeshStandardMaterial({ map: art, roughness: 0.9 }));
+      picture.position.z = 0.021;
+      g.add(frame, picture);
+      return g;
+    },
+    plant() {
+      const g = new THREE.Group();
+      const pot = new THREE.Mesh(new THREE.CylinderGeometry(0.16, 0.12, 0.32, 24), mat(0xb5653a, 0.75));
+      pot.position.y = 0.16;
+      const rim = new THREE.Mesh(new THREE.CylinderGeometry(0.175, 0.175, 0.05, 24), mat(0x9c5430, 0.75));
+      rim.position.y = 0.31;
+      const leafMat = mat(0x3f7d4e, 0.85);
+      [[0, 0.62, 0, 0.26], [-0.14, 0.5, 0.05, 0.18], [0.15, 0.52, -0.03, 0.19], [0.02, 0.82, 0.02, 0.16]]
+        .forEach(([x, y, z, r]) => {
+          const leaf = new THREE.Mesh(new THREE.IcosahedronGeometry(r, 1), leafMat);
+          leaf.position.set(x, y, z); g.add(leaf);
+        });
+      g.add(pot, rim);
+      return g;
+    },
+    closet() {
+      const g = new THREE.Group();
+      const body = box(1.2, 2.0, 0.6, mat(0x8a6340)); body.position.set(0, 1.0, 0.3);
+      g.add(body);
+      const doorMat = mat(0xc9a77c, 0.7);
+      const lineMat = mat(0xa8865c, 0.7);
+      for (const cx of [-0.435, -0.145, 0.145, 0.435]) {
+        const panel = box(0.27, 1.9, 0.02, doorMat); panel.position.set(cx, 1.0, 0.61);
+        g.add(panel);
+        for (const [cy, hh] of [[1.45, 0.75], [0.55, 0.78]]) {
+          const w = 0.17;
+          const parts = [
+            [0, cy + hh / 2, w, 0.015], [0, cy - hh / 2, w, 0.015],
+            [-w / 2, cy, 0.015, hh], [w / 2, cy, 0.015, hh],
+          ];
+          for (const [x, y, pw, ph] of parts) {
+            const p = box(pw, ph, 0.008, lineMat); p.position.set(cx + x, y, 0.624); g.add(p);
+          }
+        }
+      }
+      for (const sx of [-1, 1]) {
+        const handle = box(0.025, 0.16, 0.03, mat(0x5e3f22, 0.5)); handle.position.set(sx * 0.05, 1.12, 0.635);
+        g.add(handle);
+      }
+      const keyhole = new THREE.Mesh(new THREE.CylinderGeometry(0.012, 0.012, 0.01, 12), mat(0x2a1c10));
+      keyhole.rotation.x = Math.PI / 2; keyhole.position.set(0.05, 0.95, 0.622);
+      g.add(keyhole);
+      return g;
+    },
+    closetOpen() {
+      const g = new THREE.Group();
+      const wood = mat(0x8a6340);
+      const inner = mat(0x3b2f25, 0.9);
+      const back = box(1.2, 2.0, 0.02, inner); back.position.set(0, 1.0, 0.01);
+      const top = box(1.2, 0.04, 0.6, wood); top.position.set(0, 1.98, 0.3);
+      const bottom = box(1.2, 0.06, 0.6, wood); bottom.position.set(0, 0.03, 0.3);
+      g.add(back, top, bottom);
+      for (const x of [-0.59, 0.59]) {
+        const side = box(0.02, 2.0, 0.6, wood); side.position.set(x, 1.0, 0.3); g.add(side);
+      }
+      const rod = new THREE.Mesh(new THREE.CylinderGeometry(0.012, 0.012, 1.14, 12), mat(0xb0b0b0, 0.3, 0.8));
+      rod.rotation.z = Math.PI / 2; rod.position.set(0, 1.78, 0.3);
+      g.add(rod);
+      [[-0.32, 0x6b7f99, 0.72], [0.02, 0xc8d4c0, 0.5], [0.33, 0xa05252, 0.85]].forEach(([x, color, len]) => {
+        const hanger = box(0.2, 0.012, 0.012, mat(0xcfcfcf, 0.4)); hanger.position.set(x, 1.72, 0.3);
+        const cloth = new THREE.Mesh(new THREE.CylinderGeometry(0.1, 0.15, len, 16, 1), mat(color, 0.9));
+        cloth.scale.set(1, 1, 0.35);
+        cloth.position.set(x, 1.72 - len / 2, 0.3);
+        g.add(hanger, cloth);
+      });
+      const doorMat = mat(0xc9a77c, 0.7);
+      const panelBetween = (ax, az, bx, bz) => {
+        const p = box(Math.hypot(bx - ax, bz - az), 1.9, 0.02, doorMat);
+        p.position.set((ax + bx) / 2, 1.0, (az + bz) / 2);
+        p.rotation.y = Math.atan2(-(bz - az), bx - ax);
+        return p;
+      };
+      const fold = 25 * Math.PI / 180;
+      for (const sx of [-1, 1]) {
+        const ax = sx * 0.58, az = 0.61;
+        const tx = ax - sx * 0.28 * Math.sin(fold);
+        const tz = az + 0.28 * Math.cos(fold);
+        const bx = ax - sx * 0.56 * Math.sin(fold), bz = az;
+        g.add(panelBetween(ax, az, tx, tz), panelBetween(tx, tz, bx, bz));
+        const handle = box(0.025, 0.16, 0.03, mat(0x5e3f22, 0.5)); handle.position.set(bx + sx * 0.02, 1.12, az + 0.03);
+        g.add(handle);
+      }
+      return g;
+    },
+    bed() {
+      const g = new THREE.Group();
+      const L = 1.95, W = 0.9;
+      const wood = mat(0x8a6340, 0.7);
+      for (const x of [-L / 2 + 0.05, L / 2 - 0.05]) for (const z of [0.05, W - 0.05]) {
+        const leg = box(0.06, 0.2, 0.06, mat(0x7a5532, 0.7)); leg.position.set(x, 0.1, z); g.add(leg);
+      }
+      const frame = box(L, 0.14, W, wood); frame.position.set(0, 0.27, W / 2);
+      const dark = box(L - 0.1, 0.19, 0.01, mat(0x1c1611, 1)); dark.position.set(0, 0.1, W - 0.25);
+      const underFloor = box(L - 0.1, 0.005, W - 0.1, mat(0x2a211a, 1)); underFloor.position.set(0, 0.003, W / 2);
+      const mattress = box(L - 0.08, 0.18, W - 0.04, mat(0xf4efe6, 0.95)); mattress.position.set(0.0, 0.43, W / 2);
+      const blanket = box(1.25, 0.05, W, mat(0x6d8fb8, 0.95)); blanket.position.set(0.3, 0.545, W / 2);
+      const drape = box(1.25, 0.2, 0.02, mat(0x6d8fb8, 0.95)); drape.position.set(0.3, 0.45, W + 0.005);
+      const pillow = box(0.35, 0.1, 0.55, mat(0xffffff, 0.95)); pillow.position.set(-L / 2 + 0.28, 0.57, W / 2);
+      const head = box(0.05, 0.9, W, mat(0x7a5532, 0.65)); head.position.set(-L / 2 + 0.02, 0.45, W / 2);
+      const foot = box(0.04, 0.5, W, mat(0x7a5532, 0.65)); foot.position.set(L / 2 - 0.02, 0.25, W / 2);
+      g.add(frame, dark, underFloor, mattress, blanket, drape, pillow, head, foot);
+      return g;
+    },
+    window() {
+      const g = new THREE.Group();
+      const outside = canvasTexture(256, 160, (c, w, h) => {
+        c.fillStyle = '#8e9296'; c.fillRect(0, 0, w, h);
+        c.strokeStyle = '#7b7f83'; c.lineWidth = 3;
+        for (const y of [40, 80, 120]) { c.beginPath(); c.moveTo(0, y); c.lineTo(w, y); c.stroke(); }
+        c.fillStyle = 'rgba(255,255,255,.25)';
+        c.beginPath(); c.moveTo(10, 10); c.lineTo(60, 10); c.lineTo(10, 60); c.fill();
+      });
+      const view = new THREE.Mesh(new THREE.PlaneGeometry(1.1, 0.7),
+        new THREE.MeshStandardMaterial({ map: outside, roughness: 0.4 }));
+      view.position.z = 0.004;
+      g.add(view);
+      const white = mat(0xf4f1ea, 0.6);
+      for (const [x, y, w, h] of [[0, 0.38, 1.2, 0.06], [0, -0.38, 1.2, 0.06], [-0.57, 0, 0.06, 0.82], [0.57, 0, 0.06, 0.82], [0, 0, 0.05, 0.7]]) {
+        const p = box(w, h, 0.05, white); p.position.set(x, y, 0.025); g.add(p);
+      }
+      const sill = box(1.3, 0.04, 0.12, white); sill.position.set(0, -0.42, 0.06);
+      g.add(sill);
+      return g;
+    },
+    flashlight() {
+      const g = new THREE.Group();
+      const body = new THREE.Mesh(new THREE.CylinderGeometry(0.028, 0.028, 0.18, 16), mat(0x3a5fa8, 0.5));
+      body.rotation.z = Math.PI / 2; body.position.set(-0.03, 0.028, 0);
+      const head = new THREE.Mesh(new THREE.CylinderGeometry(0.045, 0.03, 0.06, 16), mat(0x2c4a85, 0.5));
+      head.rotation.z = Math.PI / 2; head.position.set(0.09, 0.045, 0);
+      const lens = new THREE.Mesh(new THREE.CircleGeometry(0.04, 16),
+        new THREE.MeshStandardMaterial({ color: 0xfff3b0, emissive: 0x665c20 }));
+      lens.rotation.y = Math.PI / 2; lens.position.set(0.121, 0.045, 0);
+      const sw = box(0.03, 0.012, 0.02, mat(0xdddddd, 0.5)); sw.position.set(-0.04, 0.058, 0);
+      g.add(body, head, lens, sw);
+      g.rotation.y = 0.35;
+      return g;
+    },
+    board() {
+      const g = new THREE.Group();
+      const plank = box(1.05, 0.18, 0.03, mat(0x9a7a52, 0.9));
+      g.add(plank);
+      const screwMat = mat(0xb8bec4, 0.35, 0.8);
+      for (const x of [-0.45, 0.45]) for (const y of [-0.05, 0.05]) {
+        const s = new THREE.Mesh(new THREE.CylinderGeometry(0.014, 0.014, 0.008, 12), screwMat);
+        s.rotation.x = Math.PI / 2; s.position.set(x, y, 0.019); g.add(s);
+      }
+      return g;
+    },
+    trash() {
+      const g = new THREE.Group();
+      const can = new THREE.Mesh(new THREE.CylinderGeometry(0.17, 0.13, 0.4, 28), mat(0x9aa7b0, 0.5, 0.3));
+      can.position.y = 0.2;
+      const rim = new THREE.Mesh(new THREE.CylinderGeometry(0.18, 0.18, 0.05, 28), mat(0x4a5258, 0.5));
+      rim.position.y = 0.39;
+      const inside = new THREE.Mesh(new THREE.CircleGeometry(0.16, 28), mat(0x2a2f33, 0.9));
+      inside.rotation.x = -Math.PI / 2; inside.position.y = 0.416;
+      g.add(can, rim, inside);
+      return g;
+    },
+    bookshelf() {
+      const g = new THREE.Group();
+      const wood = mat(0x7a5532, 0.75);
+      const back = box(1.74, 1.2, 0.02, mat(0x5e3f22, 0.85)); back.position.set(0, 0.6, 0.01);
+      g.add(back);
+      for (const x of [-0.85, 0.85]) {
+        const side = box(0.04, 1.2, 0.32, wood); side.position.set(x, 0.6, 0.16); g.add(side);
+      }
+      for (const y of [0.0575, 0.62, 1.18]) {
+        const th = y < 0.1 ? 0.115 : 0.03;
+        const board = box(1.66, th, 0.32, wood); board.position.set(0, y, 0.16); g.add(board);
+      }
+      return g;
+    },
+    book() {
+      const spine = canvasTexture(128, 180, (c, w, h) => {
+        c.fillStyle = '#3d5a4a'; c.fillRect(0, 0, w, h);
+        c.fillStyle = '#c9a447';
+        c.fillRect(0, 12, w, 6); c.fillRect(0, h - 18, w, 6);
+        c.fillRect(0, h / 2 - 2, w, 4);
+      });
+      const cloth = mat(0x3d5a4a, 0.85);
+      const pages = mat(0xeee6d4, 0.9);
+      const mats = [cloth, cloth, pages, pages,
+        new THREE.MeshStandardMaterial({ map: spine, roughness: 0.85 }), pages];
+      const b = new THREE.Mesh(new THREE.BoxGeometry(0.30, 0.42, 0.26), mats);
+      b.position.y = 0.21;
+      const g = new THREE.Group();
+      g.add(b);
+      return g;
+    },
+    platesZoom(plates) {
+      const g = new THREE.Group();
+      const hex = id => LOCK_COLORS.find(c => c.id === id).hex;
+      plates.slice().reverse().forEach((id, k) => {
+        const plate = new THREE.Mesh(new THREE.CylinderGeometry(0.17, 0.13, 0.03, 48), mat(hex(id), 0.45));
+        plate.position.y = -0.06 + k * 0.035;
+        g.add(plate);
+      });
+      const top = new THREE.Mesh(new THREE.CylinderGeometry(0.11, 0.11, 0.004, 48),
+        new THREE.MeshStandardMaterial({ color: hex(plates[0]), roughness: 0.3, emissive: 0x111111 }));
+      top.position.y = -0.06 + 3 * 0.035 + 0.016;
+      g.add(top);
+      g.rotation.x = 0.45;
+      return g;
+    },
+    bookCover({ volume, bookmark }) {
+      const W = 0.26, H = 0.42, T = 0.07;
+      const cover = canvasTexture(520, 840, (c, w, h) => {
+        c.fillStyle = '#3d5a4a'; c.fillRect(0, 0, w, h);
+        c.strokeStyle = '#c9a447';
+        c.lineWidth = 6; c.strokeRect(28, 28, w - 56, h - 56);
+        c.lineWidth = 2; c.strokeRect(44, 44, w - 88, h - 88);
+        c.fillStyle = '#e3c66a';
+        c.textAlign = 'center'; c.textBaseline = 'middle';
+        c.font = 'bold 50px "Hiragino Mincho ProN", "Yu Mincho", serif';
+        c.fillText(BOOK_TITLE, w / 2, h * 0.24);
+        c.lineWidth = 5;
+        c.beginPath(); c.arc(w / 2, h * 0.5, 82, 0, Math.PI * 2); c.stroke();
+        c.lineWidth = 2;
+        c.beginPath(); c.arc(w / 2, h * 0.5, 66, 0, Math.PI * 2); c.stroke();
+        c.beginPath(); c.moveTo(w / 2, h * 0.5 - 46); c.lineTo(w / 2 + 34, h * 0.5);
+        c.lineTo(w / 2, h * 0.5 + 46); c.lineTo(w / 2 - 34, h * 0.5); c.closePath(); c.fill();
+        c.font = 'bold 72px "Hiragino Mincho ProN", "Yu Mincho", serif';
+        c.fillText(`第${volume}巻`, w / 2, h * 0.78);
+      });
+      const cloth = mat(0x3d5a4a, 0.85);
+      const pages = mat(0xeee6d4, 0.9);
+      const mats = [pages, cloth, pages, pages,
+        new THREE.MeshStandardMaterial({ map: cover, roughness: 0.8 }), cloth];
+      const g = new THREE.Group();
+      g.add(new THREE.Mesh(new THREE.BoxGeometry(W, H, T), mats));
+      if (bookmark) {
+        const ribbon = box(0.03, 0.12, 0.003, mat(bookmark.hex, 0.7));
+        ribbon.position.set(0.05, H / 2 - 0.01, 0);
+        g.add(ribbon);
+      }
+      g.rotation.y = 0.25;
+      return g;
+    },
+    safe() {
+      const g = new THREE.Group();
+      const frame = box(0.62, 0.48, 0.05, mat(0x6f757b, 0.45, 0.6));
+      const door = box(0.52, 0.38, 0.02, mat(0x9aa1a8, 0.4, 0.6)); door.position.z = 0.03;
+      const display = canvasTexture(160, 64, (c, w, h) => {
+        c.fillStyle = '#1e2a22'; c.fillRect(0, 0, w, h);
+        c.fillStyle = '#7fe39a';
+        c.font = 'bold 44px monospace';
+        c.textAlign = 'center'; c.textBaseline = 'middle';
+        c.fillText('----', w / 2, h / 2 + 2);
+      });
+      const win = new THREE.Mesh(new THREE.PlaneGeometry(0.22, 0.088),
+        new THREE.MeshStandardMaterial({ map: display, roughness: 0.4, emissive: 0x0c2a14 }));
+      win.position.set(-0.06, 0.07, 0.041);
+      const handle = box(0.1, 0.035, 0.03, mat(0x454a4f, 0.4, 0.6)); handle.position.set(0.15, -0.08, 0.05);
+      g.add(frame, door, win, handle);
+      return g;
+    },
+    safeOpen() {
+      const g = new THREE.Group();
+      const metal = mat(0x6f757b, 0.45, 0.6);
+      for (const [x, y, w, h] of [[0, 0.215, 0.62, 0.05], [0, -0.215, 0.62, 0.05], [-0.285, 0, 0.05, 0.48], [0.285, 0, 0.05, 0.48]]) {
+        const p = box(w, h, 0.05, metal); p.position.set(x, y, 0); g.add(p);
+      }
+      const inside = box(0.52, 0.38, 0.004, mat(0x24282b, 0.9)); inside.position.z = 0.004;
+      const shelf = box(0.52, 0.02, 0.02, mat(0x33383c, 0.8)); shelf.position.set(0, -0.12, 0.016);
+      const hinge = new THREE.Group();
+      hinge.position.set(-0.26, 0, 0.03);
+      const door = box(0.52, 0.38, 0.02, mat(0x9aa1a8, 0.4, 0.6)); door.position.x = 0.26;
+      hinge.add(door);
+      hinge.rotation.y = -1.9;
+      g.add(inside, shelf, hinge);
+      return g;
+    },
+    clock() {
+      const g = new THREE.Group();
+      const rim = new THREE.Mesh(new THREE.CylinderGeometry(0.21, 0.21, 0.05, 48), mat(0x5e3f22, 0.5));
+      rim.rotation.x = Math.PI / 2; rim.position.z = 0.025;
+      const face = canvasTexture(256, 256, (c, w, h) => {
+        const cx = w / 2, cy = h / 2, r = w / 2;
+        c.fillStyle = '#fdfaf3'; c.fillRect(0, 0, w, h);
+        const pt = (a, d) => [cx + d * Math.sin(a * Math.PI / 180), cy - d * Math.cos(a * Math.PI / 180)];
+        c.fillStyle = '#333';
+        c.font = 'bold 46px system-ui, sans-serif';
+        c.textAlign = 'center'; c.textBaseline = 'middle';
+        [['12', 0], ['3', 90], ['6', 180], ['9', 270]].forEach(([t, a]) => {
+          const [x, y] = pt(a, r * 0.72); c.fillText(t, x, y + 2);
+        });
+        c.fillStyle = '#666';
+        for (let i = 0; i < 12; i++) {
+          if (i % 3 === 0) continue;
+          const [x, y] = pt(i * 30, r * 0.74);
+          c.beginPath(); c.arc(x, y, 6, 0, Math.PI * 2); c.fill();
+        }
+        c.strokeStyle = '#222'; c.lineCap = 'round';
+        const hand = (a, len, width) => {
+          const [x, y] = pt(a, len);
+          c.lineWidth = width; c.beginPath(); c.moveTo(cx, cy); c.lineTo(x, y); c.stroke();
+        };
+        hand(187.5, r * 0.45, 14);
+        hand(90, r * 0.62, 8);
+        c.fillStyle = '#222'; c.beginPath(); c.arc(cx, cy, 9, 0, Math.PI * 2); c.fill();
+      });
+      const dial = new THREE.Mesh(new THREE.CircleGeometry(0.18, 48),
+        new THREE.MeshStandardMaterial({ map: face, roughness: 0.6 }));
+      dial.position.z = 0.051;
+      g.add(rim, dial);
+      return g;
+    },
+    desk() {
+      const g = new THREE.Group();
+      const wood = mat(0xa0703f, 0.6);
+      const top = box(1.2, 0.04, 0.6, wood); top.position.set(0, 0.73, 0.3);
+      g.add(top);
+      const legMat = mat(0x7d5530, 0.6);
+      for (const x of [-0.56, 0.56]) for (const z of [0.05, 0.55]) {
+        const leg = box(0.05, 0.71, 0.05, legMat); leg.position.set(x, 0.355, z); g.add(leg);
+      }
+      const drawerBox = box(0.5, 0.15, 0.56, mat(0x8a5f35, 0.6)); drawerBox.position.set(0.28, 0.635, 0.3);
+      const front = box(0.46, 0.12, 0.02, mat(0xb98250, 0.55)); front.position.set(0.28, 0.635, 0.585);
+      const pull = box(0.12, 0.02, 0.025, mat(0x5e3f22, 0.4)); pull.position.set(0.18, 0.635, 0.605);
+      const lock = box(0.11, 0.05, 0.015, mat(0x2b2f33, 0.5)); lock.position.set(0.38, 0.635, 0.602);
+      g.add(drawerBox, front, pull, lock);
+      for (let i = 0; i < 3; i++) {
+        const dial = box(0.022, 0.03, 0.006, mat(0xdfe6ea, 0.5)); dial.position.set(0.35 + i * 0.03, 0.635, 0.611);
+        g.add(dial);
+      }
+      return g;
+    },
+  };
+
+  function buildRoom(room) {
+    const scene = new THREE.Scene();
+    const hemi = new THREE.HemisphereLight(0xfff6e8, 0x5a4a3a, 1.3);
+    scene.add(hemi);
+    const lamp = new THREE.PointLight(0xfff1dd, 9, 0, 2);
+    lamp.position.set(0, room.h - 0.15, 0);
+    lamp.castShadow = true;
+    lamp.shadow.mapSize.set(1024, 1024);
+    lamp.shadow.bias = -0.002;
+    scene.add(lamp);
+    const shade = new THREE.Mesh(new THREE.CylinderGeometry(0.22, 0.22, 0.04, 32),
+      new THREE.MeshStandardMaterial({ color: 0xffffff, emissive: 0xfff1dd, emissiveIntensity: 1 }));
+    shade.position.set(0, room.h - 0.03, 0);
+    scene.add(shade);
+    scene.userData.lights = [[hemi, 1.3], [lamp, 9]];
+
+    const floorTex = canvasTexture(512, 512, (c, w, h) => {
+      if (room.floor === 'pan') {
+        c.fillStyle = '#b9bec2'; c.fillRect(0, 0, w, h);
+        c.fillStyle = 'rgba(0,0,0,.06)';
+        for (let i = 0; i < 40; i++) c.fillRect(0, i * h / 40, w, 2);
+        return;
+      }
+      if (room.floor === 'tile') {
+        const n = 8;
+        for (let i = 0; i < n; i++) for (let j = 0; j < n; j++) {
+          c.fillStyle = (i + j) % 2 ? '#d9d4c8' : '#e9e5da';
+          c.fillRect(i * w / n, j * h / n, w / n, h / n);
+        }
+        c.strokeStyle = 'rgba(120,110,95,.5)'; c.lineWidth = 2;
+        for (let i = 0; i <= n; i++) {
+          c.beginPath(); c.moveTo(i * w / n, 0); c.lineTo(i * w / n, h); c.stroke();
+          c.beginPath(); c.moveTo(0, i * h / n); c.lineTo(w, i * h / n); c.stroke();
+        }
+        return;
+      }
+      const boards = 8;
+      for (let i = 0; i < boards; i++) {
+        c.fillStyle = i % 2 ? '#b07a4a' : '#a66f40';
+        c.fillRect(0, i * h / boards, w, h / boards);
+        c.fillStyle = 'rgba(60,30,10,.35)';
+        c.fillRect(0, i * h / boards, w, 3);
+      }
+    });
+    const floor = new THREE.Mesh(new THREE.PlaneGeometry(room.w, room.d),
+      new THREE.MeshStandardMaterial({ map: floorTex, roughness: 0.7 }));
+    floor.rotation.x = -Math.PI / 2;
+    floor.receiveShadow = true;
+    scene.add(floor);
+
+    const sink = 0.02;
+    const shell = new THREE.Mesh(new THREE.BoxGeometry(room.w, room.h + sink, room.d),
+      new THREE.MeshStandardMaterial({ color: room.wall, roughness: 0.95, side: THREE.BackSide }));
+    shell.position.y = (room.h - sink) / 2;
+    shell.receiveShadow = true;
+    scene.add(shell);
+    return scene;
+  }
+
+  const setShadows = g => g.traverse(m => { if (m.isMesh) { m.castShadow = true; m.receiveShadow = true; } });
+
+  function rebuildDynamicModels() {
+    if (!renderer) return;
+    for (const obj of OBJECTS.filter(o => typeof o.modelArg === 'function')) {
+      const holder = objGroups[obj.id];
+      const key = JSON.stringify(valueOf(obj.modelArg));
+      if (holder.userData.key === key) continue;
+      holder.userData.key = key;
+      holder.clear();
+      const g = MODELS[obj.model](valueOf(obj.modelArg));
+      setShadows(g);
+      holder.add(g);
+    }
+  }
+
+  function buildScene() {
+    try {
+      renderer = new THREE.WebGLRenderer({ antialias: true });
+    } catch (e) {
+      console.error(e);
+      roomBox.insertAdjacentHTML('beforeend', '<div id="room-error">このブラウザでは3Dの絵を描けませんでした。</div>');
+      return false;
+    }
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    renderer.shadowMap.enabled = true;
+    renderer.shadowMap.type = THREE.PCFShadowMap;
+    roomBox.prepend(renderer.domElement);
+
+    camera = new THREE.PerspectiveCamera(CAMERA.fov, 4 / 3, 0.1, 50);
+    for (const [roomId, room] of Object.entries(ROOMS)) scenes[roomId] = buildRoom(room);
+
+    const skirtMat = mat(0x8a6a4c);
+    for (const [id, f] of Object.entries(FACES)) {
+      const room = ROOMS[f.room];
+      const hw = room.w / 2, hd = room.d / 2;
+      const w = {
+        front: { pos: [0, 0, -hd], rotY: 0,            width: room.w },
+        right: { pos: [hw, 0, 0],  rotY: -Math.PI / 2, width: room.d },
+        back:  { pos: [0, 0, hd],  rotY: Math.PI,      width: room.w },
+        left:  { pos: [-hw, 0, 0], rotY: Math.PI / 2,  width: room.d },
+      }[f.side];
+      const g = new THREE.Group();
+      g.position.set(...w.pos);
+      g.rotation.y = w.rotY;
+      const skirt = box(w.width, 0.08, 0.02, skirtMat); skirt.position.set(0, 0.04, 0.01);
+      g.add(skirt);
+      scenes[f.room].add(g);
+      wallGroups[id] = g;
+    }
+
+    for (const obj of OBJECTS) {
+      const g = typeof obj.modelArg === 'function' ? new THREE.Group() : MODELS[obj.model](obj.modelArg);
+      g.position.set(...obj.at);
+      if (obj.rot) g.rotation.set(...obj.rot);
+      setShadows(g);
+      wallGroups[obj.face].add(g);
+      objGroups[obj.id] = g;
+    }
+
+    zoomScene = new THREE.Scene();
+    zoomScene.background = new THREE.Color(0x1b1916);
+    zoomScene.add(new THREE.HemisphereLight(0xfff6e8, 0x3a3028, 1.6));
+    const key = new THREE.DirectionalLight(0xfff1dd, 2.2);
+    key.position.set(-0.6, 0.8, 1.2);
+    zoomScene.add(key);
+    zoomHolder = new THREE.Group();
+    zoomScene.add(zoomHolder);
+    zoomCamera = new THREE.PerspectiveCamera(40, 4 / 3, 0.01, 10);
+    zoomCamera.position.set(0, 0, 0.86);
+    zoomCamera.lookAt(0, 0, 0);
+    return true;
+  }
+
+  function placeCamera(face) {
+    const g = wallGroups[face];
+    g.updateMatrixWorld(true);
+    const dist = FACES[face].dist ?? CAMERA.dist;
+    const shift = FACES[face].shift ?? 0;
+    const eye = g.localToWorld(new THREE.Vector3(shift, CAMERA.eye, dist));
+    const target = g.localToWorld(new THREE.Vector3(shift, FACES[face].look ?? CAMERA.look, 0));
+    camera.fov = FACES[face].fov ?? CAMERA.fov;
+    camera.position.copy(eye);
+    camera.lookAt(target);
+  }
+
+  const buttons = {};
+  for (const obj of OBJECTS) {
+    const b = document.createElement('button');
+    b.className = 'object';
+    b.setAttribute('aria-label', obj.label);
+    b.title = obj.label;
+    b.hidden = true;
+    b.addEventListener('click', () => onObjectClick(obj));
+    hitLayer.appendChild(b);
+    buttons[obj.id] = b;
+  }
+
+  function placeButtons(width, height) {
+    const bbox = new THREE.Box3();
+    const p = new THREE.Vector3();
+    for (const obj of OBJECTS) {
+      const b = buttons[obj.id];
+      if (obj.face !== state.face || !isShown(obj)) { b.hidden = true; continue; }
+      b.hidden = false;
+      bbox.setFromObject(objGroups[obj.id]);
+      let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+      for (let i = 0; i < 8; i++) {
+        p.set(i & 1 ? bbox.max.x : bbox.min.x, i & 2 ? bbox.max.y : bbox.min.y, i & 4 ? bbox.max.z : bbox.min.z);
+        p.project(camera);
+        const sx = (p.x + 1) / 2 * width, sy = (1 - p.y) / 2 * height;
+        minX = Math.min(minX, sx); maxX = Math.max(maxX, sx);
+        minY = Math.min(minY, sy); maxY = Math.max(maxY, sy);
+      }
+      minX = Math.max(0, minX); minY = Math.max(0, minY);
+      maxX = Math.min(width, maxX); maxY = Math.min(height, maxY);
+      const s = b.style;
+      s.left = minX + 'px'; s.top = minY + 'px';
+      s.width = Math.max(0, maxX - minX) + 'px'; s.height = Math.max(0, maxY - minY) + 'px';
+    }
+  }
+
+  function drawRoom() {
+    if (!renderer || !state) return;
+    const w = roomBox.clientWidth, h = roomBox.clientHeight;
+    if (!w || !h) return;
+    renderer.setSize(w, h, false);
+    if (zoomView) {
+      for (const b of Object.values(buttons)) b.hidden = true;
+      zoomHolder.clear();
+      zoomHolder.add(MODELS[zoomView.model](zoomView.arg));
+      zoomCamera.aspect = w / h;
+      zoomCamera.updateProjectionMatrix();
+      renderer.render(zoomScene, zoomCamera);
+      return;
+    }
+    rebuildDynamicModels();
+    for (const obj of OBJECTS) objGroups[obj.id].visible = isShown(obj);
+    for (const [roomId, sc] of Object.entries(scenes)) {
+      const dark = roomId === 'toilet' && state.lightOff;
+      for (const [light, base] of sc.userData.lights) light.intensity = dark ? base * 0.04 : base;
+    }
+    camera.aspect = w / h;
+    placeCamera(state.face);
+    camera.updateProjectionMatrix();
+    const scene = scenes[FACES[state.face].room];
+    scene.updateMatrixWorld(true);
+    renderer.render(scene, camera);
+    placeButtons(w, h);
+  }
+
+  function setMessage(text) { messageBox.textContent = text; }
+
+  function renderAll(fade) {
+    drawRoom();
+    renderArrows();
+    if (fade) {
+      roomBox.classList.remove('fade');
+      void roomBox.offsetWidth;
+      roomBox.classList.add('fade');
+    }
+    renderSlots();
+  }
+
+  function renderArrows() {
+    const noTurn = !!zoomView || !FACES[state.face].left;
+    document.getElementById('arrow-left').hidden = noTurn;
+    document.getElementById('arrow-right').hidden = noTurn;
+    document.getElementById('arrow-back').hidden = !zoomView;
+  }
+
+  function renderSlots() {
+    slotsBox.innerHTML = '';
+    for (let i = 0; i < SLOT_COUNT; i++) {
+      const id = state.items[i];
+      const b = document.createElement('button');
+      b.className = 'slot';
+      if (id) {
+        b.innerHTML = ITEMS[id].svg;
+        b.setAttribute('aria-label', ITEMS[id].name);
+        b.title = ITEMS[id].name;
+        b.setAttribute('aria-pressed', String(selected === id));
+        if (selected === id) b.classList.add('selected');
+        if (flashItem === id) b.classList.add('flash');
+        b.addEventListener('click', () => {
+          if (ITEMS[id].memo) {
+            selected = null;
+            setMessage(ITEMS[id].memo);
+          } else {
+            selected = selected === id ? null : id;
+            if (selected) setMessage(ITEMS[id].desc || `${ITEMS[id].name}だ。`);
+          }
+          renderSlots();
+        });
+      } else {
+        b.disabled = true;
+        b.setAttribute('aria-label', '空き');
+      }
+      slotsBox.appendChild(b);
+    }
+    flashItem = null;
+  }
+
+  function showTitle() {
+    closeMenu();
+    zoomView = null;
+    dividerScreen.hidden = true;
+    btnContinue.disabled = !load();
+    titleScreen.hidden = false;
+    document.getElementById('btn-new').focus({ preventScroll: true });
+  }
+  function startGame(data, message) {
+    state = data;
+    rebuildDynamicModels();
+    selected = null;
+    zoomView = null;
+    save();
+    titleScreen.hidden = true;
+    setMessage(message);
+    renderAll(false);
+    if (state.flags.entranceOpen) showClear();
+  }
+  const clearScreen = document.getElementById('clear-screen');
+  function showClear() {
+    closeMenu();
+    clearScreen.hidden = false;
+  }
+  document.getElementById('btn-clear').addEventListener('click', () => { clearScreen.hidden = true; showTitle(); });
+
+  function showDivider(debug) {
+    closeMenu();
+    dividerDebug = debug;
+    btnDivider.textContent = debug ? '閉じる' : '進む';
+    dividerScreen.hidden = false;
+  }
+  document.getElementById('btn-new').addEventListener('click', () => startGame(newState(), ''));
+  btnContinue.addEventListener('click', () => {
+    const data = load();
+    if (data) startGame(data, '続きから始めます。');
+  });
+  btnDivider.addEventListener('click', () => {
+    dividerScreen.hidden = true;
+  });
+
+  const lockDialog = document.getElementById('lock');
+  const lockDisplay = document.getElementById('lock-display');
+  const lockNote = document.getElementById('lock-note');
+  const keypad = document.getElementById('keypad');
+  let currentLock = null;
+  let typed = '';
+
+  function buildKeypad(lock) {
+    keypad.innerHTML = '';
+    const keys = lock.type === 'color'
+      ? [...LOCK_COLORS.map(c => c.id), 'clear', 'ok']
+      : ['1', '2', '3', '4', '5', '6', '7', '8', '9', 'clear', '0', 'ok'];
+    for (const k of keys) {
+      const b = document.createElement('button');
+      const color = LOCK_COLORS.find(c => c.id === k);
+      if (k === 'clear') { b.textContent = '消去'; b.className = 'small'; }
+      else if (k === 'ok') { b.textContent = '決定'; b.className = 'small ok'; }
+      else if (lock.type === 'color') {
+        b.textContent = color.name; b.className = 'small';
+        b.style.background = color.hex; b.style.color = color.text;
+      } else b.textContent = k;
+      b.addEventListener('click', () => pressKey(k));
+      keypad.appendChild(b);
+    }
+  }
+
+  const digitCount = lock => (lock.type === 'color' ? lock.count : [...lock.pattern].filter(ch => ch === '#').length);
+
+  function renderLockDisplay() {
+    if (currentLock.type === 'color') {
+      lockDisplay.innerHTML = Array.from({ length: currentLock.count }, (_, i) => {
+        const c = LOCK_COLORS.find(x => x.id === typed[i]);
+        return c ? `<span class="cbox" style="background:${c.hex}"></span>` : '<span class="cbox empty"></span>';
+      }).join('');
+      return;
+    }
+    let i = 0;
+    lockDisplay.innerHTML = [...currentLock.pattern].map(ch => {
+      if (ch !== '#') return `<span class="sep">${ch}</span>`;
+      const d = typed[i++];
+      return `<span>${d ?? '_'}</span>`;
+    }).join('');
+  }
+
+  function openLock(lock) {
+    currentLock = lock;
+    typed = lock.type === 'color' ? [] : '';
+    buildKeypad(lock);
+    document.getElementById('lock-prompt').textContent = lock.prompt;
+    lockNote.textContent = '';
+    renderLockDisplay();
+    lockDialog.showModal();
+    keypad.querySelector('button').focus();
+  }
+
+  function pressKey(k) {
+    const n = digitCount(currentLock);
+    lockNote.textContent = '';
+    const isColor = currentLock.type === 'color';
+    if (k === 'clear') {
+      typed = isColor ? [] : '';
+    } else if (k === 'ok') {
+      const value = isColor ? typed.join(',') : typed;
+      if (typed.length < n) {
+        lockNote.textContent = isColor ? `${n}つの色を入力してください。` : `${n}桁の数字を入力してください。`;
+      } else if (value === String(valueOf(currentLock.answer))) {
+        const lock = currentLock;
+        lockDialog.close();
+        applyResult(lock);
+        return;
+      } else {
+        typed = isColor ? [] : '';
+        lockNote.textContent = currentLock.fail || '開かない。';
+      }
+    } else if (typed.length < n) {
+      typed = isColor ? [...typed, k] : typed + k;
+    }
+    renderLockDisplay();
+  }
+  document.getElementById('lock-close').addEventListener('click', () => lockDialog.close());
+
+  document.getElementById('arrow-back').addEventListener('click', () => {
+    zoomView = null;
+    renderAll(true);
+  });
+  document.getElementById('arrow-left').addEventListener('click', () => goFace(FACES[state.face].left));
+  document.getElementById('arrow-right').addEventListener('click', () => goFace(FACES[state.face].right));
+
+  function menuItems() {
+    const list = [['タイトルに戻る', showTitle]];
+    if (DEBUG) list.push(['デバッグ', openDebug]);
+    return list;
+  }
+  function openMenu() {
+    menuBox.innerHTML = '';
+    for (const [label, action] of menuItems()) {
+      const b = document.createElement('button');
+      b.textContent = label;
+      b.addEventListener('click', () => { closeMenu(); action(); });
+      menuBox.appendChild(b);
+    }
+    menuBox.hidden = false;
+    menuBtn.setAttribute('aria-expanded', 'true');
+  }
+  function closeMenu() {
+    menuBox.hidden = true;
+    menuBtn.setAttribute('aria-expanded', 'false');
+  }
+  menuBtn.addEventListener('click', () => (menuBox.hidden ? openMenu() : closeMenu()));
+  document.addEventListener('click', e => {
+    if (menuBox.hidden || menuBox.contains(e.target) || menuBtn.contains(e.target)) return;
+    e.stopPropagation(); e.preventDefault();
+    closeMenu();
+  }, true);
+  document.addEventListener('keydown', e => {
+    if (e.key !== 'Escape') return;
+    if (!debugScreen.hidden) closeDebug();
+    else if (!menuBox.hidden) closeMenu();
+  });
+
+  const debugScreen = document.getElementById('debug-screen');
+  const debugList = document.getElementById('debug-list');
+  function debugItems() {
+    const list = [['面へ移動']];
+    for (const [id, f] of Object.entries(FACES)) list.push([`${ROOMS[f.room].name}・${f.name}へ移動`, () => goFace(id)]);
+    list.push(['画面']);
+    list.push(['区切りの画面を表示', () => showDivider(true)]);
+    list.push(['クリア画面を表示', () => showClear()]);
+    list.push([`調べられる範囲の表示: ${roomBox.classList.contains('show-hits') ? 'オン' : 'オフ'}`,
+      () => roomBox.classList.toggle('show-hits')]);
+    list.push(['保存データ']);
+    list.push(['保存データの消去', () => { clearSave(); setMessage('保存データを消しました。'); showTitle(); }]);
+    return list;
+  }
+  function openDebug() {
+    debugList.innerHTML = '';
+    for (const [label, action] of debugItems()) {
+      if (!action) {
+        const h = document.createElement('div'); h.className = 'debug-group'; h.textContent = label;
+        debugList.appendChild(h); continue;
+      }
+      const b = document.createElement('button');
+      b.textContent = label;
+      b.addEventListener('click', () => { closeDebug(); action(); });
+      debugList.appendChild(b);
+    }
+    const head = document.createElement('div'); head.className = 'debug-group'; head.textContent = '錠の答え';
+    debugList.appendChild(head);
+    const seenLocks = new Set();
+    for (const obj of OBJECTS.filter(o => o.lock)) {
+      if (seenLocks.has(obj.lock)) continue;
+      seenLocks.add(obj.lock);
+      const line = document.createElement('div'); line.className = 'debug-info';
+      const ans = state ? String(valueOf(obj.lock.answer)) : null;
+      const shown = ans === null ? '(ゲーム開始後に表示)'
+        : obj.lock.type === 'color' ? ans.split(',').map(id => LOCK_COLORS.find(c => c.id === id).name).join(' → ') : ans;
+      line.textContent = `${obj.label}: ${shown}`;
+      debugList.appendChild(line);
+    }
+    debugScreen.hidden = false;
+    debugList.querySelector('button').focus({ preventScroll: true });
+  }
+  function closeDebug() { debugScreen.hidden = true; }
+  document.getElementById('debug-close').addEventListener('click', closeDebug);
+  debugScreen.addEventListener('click', e => { if (e.target === debugScreen) closeDebug(); });
+
+  if (THREE && buildScene()) {
+    const resizeObserver = new ResizeObserver(() => drawRoom());
+    resizeObserver.observe(roomBox);
+  }
+  showTitle();
+}
+</script>
 </body>
 </html>
